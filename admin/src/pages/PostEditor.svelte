@@ -308,16 +308,30 @@ function wrapLine(prefix) {
   }
 }
 
+let showFindReplace = $state(false)
+let findText = $state('')
+let replaceText = $state('')
+let findResults = $state([])
+let findIndex = $state(-1)
+
 const toolbarActions = [
   { icon: 'mdi:format-header-1', title: '一级标题', action: () => wrapLine('# ') },
   { icon: 'mdi:format-header-2', title: '二级标题', action: () => wrapLine('## ') },
   { icon: 'mdi:format-header-3', title: '三级标题', action: () => wrapLine('### ') },
+  { icon: 'mdi:format-header-4', title: '四级标题', action: () => wrapLine('#### ') },
+  { type: 'separator' },
   { icon: 'mdi:format-bold', title: '加粗 (Ctrl+B)', action: () => insertMarkdown('**', '**', '粗体文字') },
   { icon: 'mdi:format-italic', title: '斜体 (Ctrl+I)', action: () => insertMarkdown('_', '_', '斜体文字') },
   { icon: 'mdi:format-strikethrough', title: '删除线', action: () => insertMarkdown('~~', '~~', '删除线文字') },
   { icon: 'mdi:format-color-highlight', title: '高亮', action: () => insertMarkdown('==', '==', '高亮文字') },
+  { icon: 'mdi:format-superscript', title: '上标', action: () => insertMarkdown('^', '^', '上标') },
+  { icon: 'mdi:format-subscript', title: '下标', action: () => insertMarkdown('~', '~', '下标') },
+  { type: 'separator' },
   { icon: 'mdi:code-tags', title: '行内代码', action: () => insertMarkdown('`', '`', 'code') },
   { icon: 'mdi:code-braces', title: '代码块', action: () => insertMarkdown('\n```\n', '\n```\n', '代码') },
+  { icon: 'mdi:function-variant', title: '数学公式(行内)', action: () => insertMarkdown('$', '$', 'E=mc^2') },
+  { icon: 'mdi:sigma', title: '数学公式(块)', action: () => insertMarkdown('\n$$\n', '\n$$\n', 'E = mc^2') },
+  { type: 'separator' },
   { icon: 'mdi:link-variant', title: '链接 (Ctrl+K)', action: () => {
     if (!textareaEl) return
     const start = textareaEl.selectionStart
@@ -336,12 +350,31 @@ const toolbarActions = [
     })
   }},
   { icon: 'mdi:image-outline', title: '插入图片', action: () => { showInsertMedia = true; loadInsertMedia() } },
+  { icon: 'mdi:video-outline', title: '插入视频', action: () => insertAtCursor('\n<video src="" controls width="100%"></video>\n') },
+  { type: 'separator' },
   { icon: 'mdi:format-list-bulleted', title: '无序列表', action: () => wrapLine('- ') },
   { icon: 'mdi:format-list-numbered', title: '有序列表', action: () => wrapLine('1. ') },
   { icon: 'mdi:checkbox-marked-outline', title: '任务列表', action: () => wrapLine('- [ ] ') },
+  { icon: 'mdi:format-indent-increase', title: '增加缩进', action: () => wrapLine('  ') },
+  { icon: 'mdi:format-indent-decrease', title: '减少缩进', action: () => {
+    if (!textareaEl) return
+    const start = textareaEl.selectionStart
+    const val = content
+    let lineStart = val.lastIndexOf('\n', start - 1) + 1
+    const line = val.substring(lineStart)
+    if (line.startsWith('  ')) {
+      content = val.substring(0, lineStart) + line.substring(2)
+      requestAnimationFrame(() => {
+        textareaEl.focus()
+        textareaEl.setSelectionRange(Math.max(lineStart, start - 2), Math.max(lineStart, start - 2))
+      })
+    }
+  }},
   { icon: 'mdi:format-quote-close', title: '引用', action: () => wrapLine('> ') },
+  { type: 'separator' },
   { icon: 'mdi:minus', title: '分割线', action: () => insertAtCursor('\n---\n') },
   { icon: 'mdi:table', title: '表格', action: () => insertAtCursor('\n| 列1 | 列2 | 列3 |\n| --- | --- | --- |\n| 内容 | 内容 | 内容 |\n') },
+  { icon: 'mdi:chevron-down-box-outline', title: '折叠块', action: () => insertAtCursor('\n<details>\n<summary>点击展开</summary>\n\n折叠内容\n\n</details>\n') },
   { icon: 'mdi:superscript', title: '脚注', action: () => {
     const refs = content.match(/\[\^(\d+)\](?!:)/g) || []
     const num = refs.length + 1
@@ -350,6 +383,9 @@ const toolbarActions = [
       content += `\n[^${num}]: 脚注内容`
     }, 10)
   }},
+  { icon: 'mdi:keyboard-return', title: '换行', action: () => insertAtCursor('  \n') },
+  { icon: 'mdi:comment-outline', title: 'HTML注释', action: () => insertMarkdown('<!-- ', ' -->', '注释内容') },
+  { icon: 'mdi:find-replace', title: '查找替换 (Ctrl+H)', action: () => { showFindReplace = !showFindReplace; if (showFindReplace) findInContent() } },
 ]
 
 function handleKeydown(e) {
@@ -370,23 +406,28 @@ function handleKeydown(e) {
     insertMarkdown('_', '_', '斜体文字')
   }
   if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-      e.preventDefault()
-      if (!textareaEl) return
-      const start = textareaEl.selectionStart
-      const end = textareaEl.selectionEnd
-      const selected = content.substring(start, end)
-      if (selected) {
-        insertMarkdown('[', '](url)', selected)
-      } else {
-        insertMarkdown('[', '](url)', '链接文字')
-      }
-      requestAnimationFrame(() => {
-        const urlStart = content.indexOf('](url)', start)
-        if (urlStart !== -1) {
-          textareaEl.setSelectionRange(urlStart + 2, urlStart + 5)
-        }
-      })
+    e.preventDefault()
+    if (!textareaEl) return
+    const start = textareaEl.selectionStart
+    const end = textareaEl.selectionEnd
+    const selected = content.substring(start, end)
+    if (selected) {
+      insertMarkdown('[', '](url)', selected)
+    } else {
+      insertMarkdown('[', '](url)', '链接文字')
     }
+    requestAnimationFrame(() => {
+      const urlStart = content.indexOf('](url)', start)
+      if (urlStart !== -1) {
+        textareaEl.setSelectionRange(urlStart + 2, urlStart + 5)
+      }
+    })
+  }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+    e.preventDefault()
+    showFindReplace = !showFindReplace
+    if (showFindReplace) findInContent()
+  }
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'I') {
     e.preventDefault()
     showInsertMedia = true
@@ -400,7 +441,61 @@ function handleKeydown(e) {
     if (fullscreen) { fullscreen = false; return }
     if (showInsertMedia) { showInsertMedia = false; return }
     if (showRevisions) { showRevisions = false; return }
+    if (showFindReplace) { showFindReplace = false; return }
   }
+}
+
+function findInContent() {
+  findResults = []
+  findIndex = -1
+  if (!findText || !textareaEl) return
+  const lower = content.toLowerCase()
+  const query = findText.toLowerCase()
+  let pos = 0
+  while (true) {
+    const idx = lower.indexOf(query, pos)
+    if (idx === -1) break
+    findResults.push(idx)
+    pos = idx + 1
+  }
+  if (findResults.length > 0) {
+    findIndex = 0
+    highlightFindResult()
+  }
+}
+
+function highlightFindResult() {
+  if (findIndex < 0 || findIndex >= findResults.length || !textareaEl) return
+  const pos = findResults[findIndex]
+  textareaEl.focus()
+  textareaEl.setSelectionRange(pos, pos + findText.length)
+}
+
+function findNext() {
+  if (findResults.length === 0) return
+  findIndex = (findIndex + 1) % findResults.length
+  highlightFindResult()
+}
+
+function findPrev() {
+  if (findResults.length === 0) return
+  findIndex = (findIndex - 1 + findResults.length) % findResults.length
+  highlightFindResult()
+}
+
+function replaceCurrent() {
+  if (findIndex < 0 || findIndex >= findResults.length || !textareaEl) return
+  const pos = findResults[findIndex]
+  content = content.substring(0, pos) + replaceText + content.substring(pos + findText.length)
+  findInContent()
+}
+
+function replaceAll() {
+  if (!findText) return
+  const count = (content.match(new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')) || []).length
+  content = content.replace(new RegExp(findText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), replaceText)
+  addToast(`已替换 ${count} 处`, 'success')
+  findInContent()
 }
 
 function handleImport() {
@@ -659,9 +754,12 @@ let seoUrl = $derived(`momo-blog.pages.dev/blog/${slug || 'post-slug'}`)
           <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Ctrl+I</kbd> 斜体</div>
           <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Ctrl+K</kbd> 链接</div>
           <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Ctrl+P</kbd> 预览</div>
+          <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Ctrl+H</kbd> 查找替换</div>
           <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Ctrl+Shift+I</kbd> 插入图片</div>
           <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Tab</kbd> 缩进</div>
           <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Esc</kbd> 退出全屏</div>
+          <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Enter</kbd> 下一个查找</div>
+          <div><kbd class="px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded text-xs border border-gray-200 dark:border-gray-700">Shift+Enter</kbd> 上一个查找</div>
         </div>
       </div>
     {/if}
@@ -701,17 +799,62 @@ let seoUrl = $derived(`momo-blog.pages.dev/blog/${slug || 'post-slug'}`)
           {#if !showPreview}
             <div class="flex items-center gap-0.5 flex-wrap max-w-full">
               {#each toolbarActions as btn}
-                <button
-                  onclick={btn.action}
-                  title={btn.title}
-                  class="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300 transition-colors shrink-0"
-                >
-                  <Icon icon={btn.icon} width="18" height="18" />
-                </button>
+                {#if btn.type === 'separator'}
+                  <div class="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-0.5 shrink-0"></div>
+                {:else}
+                  <button
+                    onclick={btn.action}
+                    title={btn.title}
+                    class="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300 transition-colors shrink-0"
+                  >
+                    <Icon icon={btn.icon} width="18" height="18" />
+                  </button>
+                {/if}
               {/each}
             </div>
           {/if}
         </div>
+
+        {#if showFindReplace}
+          <div class="bg-amber-50/80 dark:bg-amber-900/20 backdrop-blur border border-amber-200/50 dark:border-amber-800/50 rounded-xl p-3 flex items-center gap-2 flex-wrap">
+            <div class="relative flex-1 min-w-[120px]">
+              <input
+                type="text"
+                placeholder="查找..."
+                bind:value={findText}
+                oninput={findInContent}
+                onkeydown={(e) => { if (e.key === 'Enter') { e.shiftKey ? findPrev() : findNext() } }}
+                class="w-full px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-700 bg-white/50 dark:bg-gray-800/50 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-600"
+              />
+            </div>
+            <div class="relative flex-1 min-w-[120px]">
+              <input
+                type="text"
+                placeholder="替换为..."
+                bind:value={replaceText}
+                class="w-full px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-700 bg-white/50 dark:bg-gray-800/50 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 outline-none focus:ring-2 focus:ring-amber-300 dark:focus:ring-amber-600"
+              />
+            </div>
+            <span class="text-xs text-amber-600 dark:text-amber-400 shrink-0">
+              {#if findResults.length > 0}{findIndex + 1}/{findResults.length}{:else}0 结果{/if}
+            </span>
+            <button onclick={findPrev} class="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-800/50 transition-colors" title="上一个 (Shift+Enter)">
+              <Icon icon="mdi:chevron-up" width="16" height="16" class="text-amber-600 dark:text-amber-400" />
+            </button>
+            <button onclick={findNext} class="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-800/50 transition-colors" title="下一个 (Enter)">
+              <Icon icon="mdi:chevron-down" width="16" height="16" class="text-amber-600 dark:text-amber-400" />
+            </button>
+            <button onclick={replaceCurrent} disabled={findIndex < 0} class="px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-800/50 text-amber-700 dark:text-amber-300 text-xs hover:bg-amber-200 dark:hover:bg-amber-700/50 disabled:opacity-50 transition-colors shrink-0">
+              替换
+            </button>
+            <button onclick={replaceAll} disabled={findResults.length === 0} class="px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-800/50 text-amber-700 dark:text-amber-300 text-xs hover:bg-amber-200 dark:hover:bg-amber-700/50 disabled:opacity-50 transition-colors shrink-0">
+              全部替换
+            </button>
+            <button onclick={() => showFindReplace = false} class="p-1 rounded hover:bg-amber-100 dark:hover:bg-amber-800/50 transition-colors">
+              <Icon icon="mdi:close" width="14" height="14" class="text-amber-500 dark:text-amber-400" />
+            </button>
+          </div>
+        {/if}
 
         {#if showPreview}
           <div class="min-h-[500px] p-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 backdrop-blur prose max-w-none overflow-y-auto">
