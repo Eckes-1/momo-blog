@@ -383,10 +383,35 @@ export const media = {
   stats() {
     return request('/media/stats')
   },
-  async upload(file) {
+  async upload(file, onProgress) {
     const token = getToken()
     const formData = new FormData()
     formData.append('file', file)
+    if (onProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('POST', `${BASE}/media/upload`)
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(e.loaded, e.total)
+        }
+        xhr.onload = () => {
+          recordActivity()
+          try {
+            const data = JSON.parse(xhr.responseText)
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(data)
+            } else {
+              reject(new Error(data.message || data.error || '上传失败'))
+            }
+          } catch {
+            reject(new Error('上传失败'))
+          }
+        }
+        xhr.onerror = () => reject(new Error('网络错误'))
+        xhr.send(formData)
+      })
+    }
     const res = await fetch(`${BASE}/media/upload`, {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : {},

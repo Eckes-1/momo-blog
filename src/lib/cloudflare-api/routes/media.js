@@ -95,6 +95,7 @@ export function registerMediaRoutes(app) {
       const search = (c.req.query('search') || '').trim()
       const type = (c.req.query('type') || '').trim().toLowerCase()
       const sort = (c.req.query('sort') || 'date_desc').toLowerCase()
+      const date = (c.req.query('date') || '').trim().toLowerCase()
 
       let whereClauses = []
       let bindings = []
@@ -102,6 +103,16 @@ export function registerMediaRoutes(app) {
       if (search) {
         whereClauses.push('filename LIKE ?')
         bindings.push('%' + search + '%')
+      }
+
+      if (date && date !== 'all') {
+        if (date === 'today') {
+          whereClauses.push("created_at >= datetime('now', '+8 hours', '-1 day')")
+        } else if (date === 'week') {
+          whereClauses.push("created_at >= datetime('now', '+8 hours', '-7 days')")
+        } else if (date === 'month') {
+          whereClauses.push("created_at >= datetime('now', '+8 hours', '-30 days')")
+        }
       }
 
       if (type && type !== 'all') {

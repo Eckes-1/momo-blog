@@ -20,7 +20,7 @@ let page = $state(1)
 let totalPages = $state(1)
 let totalItems = $state(0)
 let allTotalItems = $state(0)
-let pageSize = 20
+let pageSize = $state(20)
 let imgErrors = $state(new Set())
 
 let searchQuery = $state('')
@@ -29,9 +29,11 @@ let activeType = $state('all')
 let sortBy = $state('date_desc')
 let viewMode = $state('grid')
 let gridSize = $state('md')
+let dateFilter = $state('all')
 
 let selectedIds = $state(new Set())
 let selectMode = $state(false)
+let lastSelectedId = $state(null)
 
 let stats = $state(null)
 let showStats = $state(false)
@@ -45,6 +47,22 @@ let textPreview = $state('')
 let textPreviewLoading = $state(false)
 
 let contextMenu = $state(null)
+
+let showLightbox = $state(false)
+let lightboxIdx = $state(0)
+let lightboxZoom = $state(1)
+let lightboxPan = $state({ x: 0, y: 0 })
+let lightboxDragging = $state(false)
+let lightboxDragStart = $state({ x: 0, y: 0 })
+
+let showUrlUpload = $state(false)
+let urlUploadInput = $state('')
+let urlUploading = $state(false)
+
+let uploadPercent = $state(0)
+let uploadFileName = $state('')
+
+let imageDimensions = $state(null)
 
 const typeFilters = [
   { key: 'all', label: '全部', icon: 'mdi:view-grid' },
@@ -66,6 +84,13 @@ const sortOptions = [
   { key: 'size_desc', label: '最大优先' },
   { key: 'size_asc', label: '最小优先' },
   { key: 'type', label: '按类型' }
+]
+
+const dateFilters = [
+  { key: 'all', label: '全部' },
+  { key: 'today', label: '今天' },
+  { key: 'week', label: '7天' },
+  { key: 'month', label: '30天' }
 ]
 
 const gridCols = {
@@ -195,12 +220,13 @@ async function loadData(silent = false) {
     if (searchQuery) params.search = searchQuery
     if (activeType !== 'all') params.type = activeType
     if (sortBy !== 'date_desc') params.sort = sortBy
+    if (dateFilter !== 'all') params.date = dateFilter
     const data = await media.list(params)
     mediaList = data.media || data.data || []
     const pag = data.pagination || {}
     totalPages = pag.totalPages || Math.ceil((pag.total || mediaList.length) / pageSize) || 1
     totalItems = pag.total || 0
-    if (activeType === 'all' && !searchQuery) {
+    if (activeType === 'all' && !searchQuery && dateFilter === 'all') {
       allTotalItems = totalItems
     }
   } catch (e) {
@@ -229,25 +255,37 @@ onMount(() => {
   })
   window.addEventListener('keydown', handleKeydown)
   window.addEventListener('click', closeContextMenu)
+  window.addEventListener('paste', handlePaste)
   return () => {
     off()
     window.removeEventListener('keydown', handleKeydown)
     window.removeEventListener('click', closeContextMenu)
+    window.removeEventListener('paste', handlePaste)
   }
 })
 
 onDestroy(() => {
   window.removeEventListener('keydown', handleKeydown)
   window.removeEventListener('click', closeContextMenu)
+  window.removeEventListener('paste', handlePaste)
 })
 
 function handleKeydown(e) {
   if (e.key === 'Escape') {
+    if (showLightbox) { closeLightbox(); return }
     if (contextMenu) { closeContextMenu(); return }
     if (showDetail) { closeDetail(); return }
     if (deleteTarget) { deleteTarget = null; return }
     if (selectMode) { exitSelectMode(); return }
     if (showStats) { showStats = false; return }
+  }
+  if (showLightbox) {
+    if (e.key === 'ArrowLeft') { navigateLightbox(-1); return }
+    if (e.key === 'ArrowRight') { navigateLightbox(1); return }
+    if (e.key === '+' || e.key === '=') { lightboxZoom = Math.min(5, lightboxZoom + 0.25); return }
+    if (e.key === '-') { lightboxZoom = Math.max(0.25, lightboxZoom - 0.25); return }
+    if (e.key === '0') { lightboxZoom = 1; lightboxPan = { x: 0, y: 0 }; return }
+    return
   }
   if (e.key === 'Delete' && showDetail && selectedMedia && !e.target.closest('input, textarea')) {
     deleteTarget = selectedMedia
@@ -283,30 +321,47 @@ function handleSortChange(e) {
   loadData()
 }
 
+function handleDateFilterChange(df) {
+  dateFilter = df
+  page = 1
+  loadData()
+}
+
+function handlePageSizeChange(e) {
+  pageSize = Number(e.target.value)
+  page = 1
+  loadData()
+}
+
 async function handleUpload(e) {
   const files = e.target?.files || e.dataTransfer?.files
   if (!files || files.length === 0) return
+  await processUploadFiles(files)
+  if (e.target && e.target.tagName === 'INPUT') {
+    e.target.value = ''
+  }
+}
 
-  uploading = true
-  uploadTotal = files.length
+async function handleUrlUpload() {
+  if (!urlUploadInput.trim()) return
+  urlUploading = true
   try {
-    for (let i = 0; i < files.length; i++) {
-      uploadCurrent = i + 1
-      uploadProgress = files.length > 1 ? `(${i + 1}/${files.length})` : '上传中...'
-      await media.upload(files[i])
-    }
-    addToast('上传成功', 'success')
+    const res = await fetch(urlUploadInput.trim())
+    if (!res.ok) throw new Error('无法获取文件')
+    const blob = await res.blob()
+    const urlObj = new URL(urlUploadInput.trim())
+    const filename = urlObj.pathname.split('/').pop() || 'download'
+    const file = new File([blob], filename, { type: blob.type })
+    await media.upload(file)
+    addToast('URL上传成功', 'success')
+    showUrlUpload = false
+    urlUploadInput = ''
     loadData()
     loadStats()
   } catch (e) {
-    addToast(e.message || '上传失败', 'error')
+    addToast(e.message || 'URL上传失败', 'error')
   } finally {
-    uploading = false
-    uploadProgress = ''
-    dragOver = false
-    if (e.target && e.target.tagName === 'INPUT') {
-      e.target.value = ''
-    }
+    urlUploading = false
   }
 }
 
@@ -333,6 +388,7 @@ function openDetail(item) {
   showDetail = true
   detailPreviewMode = false
   loadTextPreview(item)
+  loadImageDimensions(item)
 }
 
 function closeDetail() {
@@ -348,6 +404,51 @@ function navigateDetail(dir) {
   const next = idx + dir
   if (next < 0 || next >= mediaList.length) return
   openDetail(mediaList[next])
+}
+
+function openLightbox(idx) {
+  lightboxIdx = idx
+  lightboxZoom = 1
+  lightboxPan = { x: 0, y: 0 }
+  showLightbox = true
+}
+
+function closeLightbox() {
+  showLightbox = false
+  lightboxZoom = 1
+  lightboxPan = { x: 0, y: 0 }
+}
+
+function navigateLightbox(dir) {
+  const next = lightboxIdx + dir
+  if (next < 0 || next >= mediaList.length) return
+  lightboxIdx = next
+  lightboxZoom = 1
+  lightboxPan = { x: 0, y: 0 }
+}
+
+function handleLightboxWheel(e) {
+  e.preventDefault()
+  if (e.deltaY < 0) {
+    lightboxZoom = Math.min(5, lightboxZoom + 0.15)
+  } else {
+    lightboxZoom = Math.max(0.25, lightboxZoom - 0.15)
+  }
+}
+
+function handleLightboxMouseDown(e) {
+  if (lightboxZoom <= 1) return
+  lightboxDragging = true
+  lightboxDragStart = { x: e.clientX - lightboxPan.x, y: e.clientY - lightboxPan.y }
+}
+
+function handleLightboxMouseMove(e) {
+  if (!lightboxDragging) return
+  lightboxPan = { x: e.clientX - lightboxDragStart.x, y: e.clientY - lightboxDragStart.y }
+}
+
+function handleLightboxMouseUp() {
+  lightboxDragging = false
 }
 
 async function handleSaveDetail() {
@@ -428,7 +529,27 @@ function toggleSelect(id) {
   } else {
     newSet.add(id)
   }
+  lastSelectedId = id
   selectedIds = newSet
+}
+
+function handleSelectClick(e, item) {
+  const id = item.id || item._id
+  if (e.shiftKey && lastSelectedId) {
+    const ids = mediaList.map(m => m.id || m._id)
+    const from = ids.indexOf(lastSelectedId)
+    const to = ids.indexOf(id)
+    if (from >= 0 && to >= 0) {
+      const [start, end] = from < to ? [from, to] : [to, from]
+      const newSet = new Set(selectedIds)
+      for (let i = start; i <= end; i++) {
+        newSet.add(ids[i])
+      }
+      selectedIds = newSet
+    }
+  } else {
+    toggleSelect(id)
+  }
 }
 
 function toggleSelectAll() {
@@ -442,6 +563,7 @@ function toggleSelectAll() {
 function exitSelectMode() {
   selectMode = false
   selectedIds = new Set()
+  lastSelectedId = null
 }
 
 function copyToClipboard(text, label = '已复制') {
@@ -521,6 +643,123 @@ function handleContextMenu(e, item) {
 function closeContextMenu() {
   contextMenu = null
 }
+
+function handlePaste(e) {
+  const items = e.clipboardData?.items
+  if (!items) return
+  const files = []
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile()
+      if (file) {
+        const ext = file.type.split('/')[1] || 'png'
+        const namedFile = new File([file], `paste-${Date.now()}.${ext}`, { type: file.type })
+        files.push(namedFile)
+      }
+    }
+  }
+  if (files.length > 0) {
+    e.preventDefault()
+    processUploadFiles(files)
+  }
+}
+
+async function processUploadFiles(files) {
+  const fileArray = Array.from(files)
+  const oversized = fileArray.filter(f => f.size > 10 * 1024 * 1024)
+  if (oversized.length > 0) {
+    const names = oversized.map(f => f.name).join(', ')
+    addToast(`大文件警告: ${names} 超过10MB，上传可能较慢`, 'info')
+  }
+
+  const duplicateNames = fileArray.filter(f =>
+    mediaList.some(m => m.filename === f.name)
+  )
+  if (duplicateNames.length > 0) {
+    const names = duplicateNames.map(f => f.name).join(', ')
+    addToast(`存在同名文件: ${names}，将自动重命名`, 'warning')
+  }
+
+  uploading = true
+  uploadTotal = fileArray.length
+  try {
+    for (let i = 0; i < fileArray.length; i++) {
+      uploadCurrent = i + 1
+      uploadFileName = fileArray[i].name
+      uploadPercent = 0
+      uploadProgress = fileArray.length > 1 ? `(${i + 1}/${fileArray.length})` : ''
+      await media.upload(fileArray[i], (loaded, total) => {
+        uploadPercent = Math.round((loaded / total) * 100)
+      })
+    }
+    addToast('上传成功', 'success')
+    loadData()
+    loadStats()
+  } catch (e) {
+    addToast(e.message || '上传失败', 'error')
+  } finally {
+    uploading = false
+    uploadProgress = ''
+    uploadPercent = 0
+    uploadFileName = ''
+    dragOver = false
+  }
+}
+
+function loadImageDimensions(item) {
+  imageDimensions = null
+  const type = getFileType(item)
+  if (type !== 'image') return
+  const url = getFileUrl(item)
+  if (!url) return
+  const img = new Image()
+  img.onload = () => {
+    imageDimensions = { width: img.naturalWidth, height: img.naturalHeight }
+  }
+  img.onerror = () => {
+    imageDimensions = null
+  }
+  img.src = url
+}
+
+function batchCopyUrls() {
+  const items = mediaList.filter(m => selectedIds.has(m.id || m._id))
+  const urls = items.map(m => {
+    const url = getFullUrl(m)
+    return url
+  }).join('\n')
+  copyToClipboard(urls, `已复制 ${items.length} 个链接`)
+}
+
+function batchCopyMarkdown() {
+  const items = mediaList.filter(m => selectedIds.has(m.id || m._id))
+  const md = items.map(m => {
+    const url = getFullUrl(m)
+    const type = getFileType(m)
+    return type === 'image' ? `![${m.filename}](${url})` : `[${m.filename}](${url})`
+  }).join('\n')
+  copyToClipboard(md, `已复制 ${items.length} 个 Markdown`)
+}
+
+function batchCopyHtml() {
+  const items = mediaList.filter(m => selectedIds.has(m.id || m._id))
+  const html = items.map(m => {
+    const url = getFullUrl(m)
+    const type = getFileType(m)
+    if (type === 'image') return `<img src="${url}" alt="${m.filename}" />`
+    if (type === 'video') return `<video src="${url}" controls></video>`
+    if (type === 'audio') return `<audio src="${url}" controls></audio>`
+    return `<a href="${url}">${m.filename}</a>`
+  }).join('\n')
+  copyToClipboard(html, `已复制 ${items.length} 个 HTML`)
+}
+
+function handleStatTypeClick(type) {
+  activeType = type
+  page = 1
+  selectedIds = new Set()
+  loadData()
+}
 </script>
 
 <div class="space-y-3">
@@ -542,6 +781,13 @@ function closeContextMenu() {
         </button>
       {/if}
       <button
+        onclick={() => showUrlUpload = !showUrlUpload}
+        class="p-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-700/80 transition-colors shrink-0"
+        title="URL上传"
+      >
+        <Icon icon="mdi:link-variant" width="15" height="15" class="text-gray-500 dark:text-gray-400" />
+      </button>
+      <button
         onclick={() => { showStats = !showStats; if (showStats) loadStats() }}
         class="p-1.5 rounded-full border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 hover:bg-white/80 dark:hover:bg-gray-700/80 transition-colors shrink-0"
         title="存储统计"
@@ -555,12 +801,46 @@ function closeContextMenu() {
     </div>
   </div>
 
+  {#if showUrlUpload}
+    <div class="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-xl border border-gray-200 dark:border-gray-700 p-3 shadow-sm">
+      <div class="flex gap-2">
+        <input
+          type="url"
+          bind:value={urlUploadInput}
+          placeholder="输入文件URL地址..."
+          class="flex-1 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 text-gray-900 dark:text-gray-100 text-sm focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:border-transparent outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 min-w-0"
+          onkeydown={(e) => { if (e.key === 'Enter') handleUrlUpload() }}
+        />
+        <button
+          onclick={handleUrlUpload}
+          disabled={urlUploading || !urlUploadInput.trim()}
+          class="px-3 py-1.5 rounded-lg bg-gray-900/80 dark:bg-gray-100/80 text-white dark:text-gray-900 text-xs font-medium hover:bg-gray-800/80 dark:hover:bg-gray-200/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+        >
+          {urlUploading ? '上传中...' : '上传'}
+        </button>
+        <button
+          onclick={() => { showUrlUpload = false; urlUploadInput = '' }}
+          class="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0"
+        >
+          <Icon icon="mdi:close" width="14" height="14" class="text-gray-400 dark:text-gray-500" />
+        </button>
+      </div>
+      <p class="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5">输入远程文件URL，服务端将下载并保存到媒体库</p>
+    </div>
+  {/if}
+
   {#if uploading}
     <div class="bg-blue-50/60 dark:bg-blue-900/20 rounded-lg px-3 py-1.5 flex items-center gap-2">
       <div class="flex-1 bg-blue-100 dark:bg-blue-900/40 rounded-full h-1.5 overflow-hidden">
-        <div class="h-full bg-blue-500 rounded-full transition-all" style="width: {uploadTotal > 0 ? (uploadCurrent / uploadTotal * 100) : 0}%"></div>
+        <div class="h-full bg-blue-500 rounded-full transition-all" style="width: {uploadPercent}%"></div>
       </div>
-      <span class="text-xs text-blue-600 dark:text-blue-400 shrink-0">{uploadCurrent}/{uploadTotal}</span>
+      <span class="text-xs text-blue-600 dark:text-blue-400 shrink-0">{uploadPercent}%</span>
+      {#if uploadTotal > 1}
+        <span class="text-xs text-blue-500 dark:text-blue-500 shrink-0">{uploadCurrent}/{uploadTotal}</span>
+      {/if}
+      {#if uploadFileName}
+        <span class="text-xs text-blue-400 dark:text-blue-500 truncate max-w-[120px]">{uploadFileName}</span>
+      {/if}
     </div>
   {/if}
 
@@ -581,6 +861,29 @@ function closeContextMenu() {
           <Icon icon="mdi:download" width="13" height="13" />
           下载({selectedIds.size})
         </button>
+        <div class="relative group">
+          <button
+            class="px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 text-xs hover:bg-white/80 dark:hover:bg-gray-700/80 transition-colors flex items-center gap-1 shrink-0"
+          >
+            <Icon icon="mdi:content-copy" width="13" height="13" />
+            复制({selectedIds.size})
+            <Icon icon="mdi:chevron-down" width="12" height="12" />
+          </button>
+          <div class="absolute left-0 top-full mt-1 z-20 bg-white/95 dark:bg-gray-800/95 backdrop-blur-2xl rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 py-1 min-w-[140px] hidden group-hover:block">
+            <button onclick={batchCopyUrls} class="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
+              <Icon icon="mdi:link-variant" width="14" height="14" class="text-gray-400 dark:text-gray-500" />
+              复制链接
+            </button>
+            <button onclick={batchCopyMarkdown} class="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
+              <Icon icon="mdi:language-markdown" width="14" height="14" class="text-gray-400 dark:text-gray-500" />
+              复制 Markdown
+            </button>
+            <button onclick={batchCopyHtml} class="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
+              <Icon icon="mdi:code-tags" width="14" height="14" class="text-gray-400 dark:text-gray-500" />
+              复制 HTML
+            </button>
+          </div>
+        </div>
       {/if}
       <button
         onclick={toggleSelectAll}
@@ -589,7 +892,7 @@ function closeContextMenu() {
         <Icon icon={selectedIds.size === mediaList.length && mediaList.length > 0 ? 'mdi:checkbox-marked' : 'mdi:checkbox-blank-outline'} width="13" height="13" />
         {selectedIds.size === mediaList.length && mediaList.length > 0 ? '取消全选' : '全选'}
       </button>
-      <span class="text-xs text-gray-400 dark:text-gray-500">已选 {selectedIds.size} 项</span>
+      <span class="text-xs text-gray-400 dark:text-gray-500">已选 {selectedIds.size} 项 · Shift+点击范围选择 · Ctrl+V粘贴上传</span>
       <button onclick={exitSelectMode} class="px-2.5 py-1 rounded-full border border-gray-200 dark:border-gray-700 bg-white/60 dark:bg-gray-800/60 text-xs hover:bg-white/80 dark:hover:bg-gray-700/80 transition-colors shrink-0 ml-auto">
         退出选择
       </button>
@@ -645,7 +948,11 @@ function closeContextMenu() {
       {#if Object.keys(stats.byType).length > 0}
         <div class="space-y-1.5">
           {#each Object.entries(stats.byType) as [type, info]}
-            <div class="flex items-center gap-2 text-xs">
+            <div
+              class="flex items-center gap-2 text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 rounded-lg px-1 py-0.5 -mx-1 transition-colors"
+              onclick={() => handleStatTypeClick(type)}
+              title="点击筛选{type}类型"
+            >
               <span class="w-14 text-gray-500 dark:text-gray-400 capitalize">{type}</span>
               <div class="flex-1 bg-gray-100 dark:bg-gray-700/50 rounded-full h-2 overflow-hidden">
                 <div
@@ -698,6 +1005,16 @@ function closeContextMenu() {
         <option value={opt.key}>{opt.label}</option>
       {/each}
     </select>
+    <select
+      value={pageSize}
+      onchange={handlePageSizeChange}
+      class="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 text-xs outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 shrink-0"
+      title="每页数量"
+    >
+      <option value={20}>20条</option>
+      <option value={40}>40条</option>
+      <option value={60}>60条</option>
+    </select>
     <div class="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shrink-0">
       <button
         onclick={() => viewMode = 'grid'}
@@ -741,6 +1058,15 @@ function closeContextMenu() {
         {/if}
       </button>
     {/each}
+    <div class="border-l border-gray-200 dark:border-gray-700 mx-1 shrink-0"></div>
+    {#each dateFilters as df}
+      <button
+        onclick={() => handleDateFilterChange(df.key)}
+        class="px-2.5 py-1 rounded-full text-xs font-medium transition-colors shrink-0 {dateFilter === df.key ? 'bg-gray-900/80 dark:bg-gray-100/80 text-white dark:text-gray-900' : 'bg-white/50 dark:bg-gray-800/50 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 hover:bg-white/70 dark:hover:bg-gray-700/70'}"
+      >
+        {df.label}
+      </button>
+    {/each}
   </div>
 
   <label
@@ -753,6 +1079,7 @@ function closeContextMenu() {
     <div class="{dragOver ? 'text-blue-500 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}">
       <Icon icon="mdi:cloud-upload-outline" width="28" height="28" class="mx-auto mb-1" />
       <p class="text-xs">{dragOver ? '松开以上传' : '点击或拖拽文件到此处上传'}</p>
+      <p class="text-[10px] mt-0.5 opacity-60">支持 Ctrl+V 粘贴图片</p>
     </div>
   </label>
 
@@ -763,12 +1090,12 @@ function closeContextMenu() {
   {:else if mediaList.length === 0}
     <div class="text-center py-12 text-gray-400 dark:text-gray-500">
       <Icon icon="mdi:folder-open-outline" width="48" height="48" class="mx-auto mb-2 opacity-50" />
-      <p>{searchQuery || activeType !== 'all' ? '没有找到匹配的文件' : '暂无媒体文件'}</p>
+      <p>{searchQuery || activeType !== 'all' || dateFilter !== 'all' ? '没有找到匹配的文件' : '暂无媒体文件'}</p>
     </div>
   {:else}
     {#if viewMode === 'grid'}
       <div class="grid {gridCols[gridSize]} gap-3">
-        {#each mediaList as item (item.id || item._id)}
+        {#each mediaList as item, idx (item.id || item._id)}
           {@const fileType = getFileType(item)}
           {@const fileUrl = getFileUrl(item)}
           {@const hasError = imgErrors.has(item.id || item._id)}
@@ -776,8 +1103,9 @@ function closeContextMenu() {
           {@const isNew = isNewFile(item)}
           <div
             class="group relative bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-xl border overflow-hidden cursor-pointer shadow-sm hover:shadow-md transition-shadow {isSelected ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-200 dark:ring-blue-800' : 'border-gray-200 dark:border-gray-700'}"
-            onclick={() => selectMode ? toggleSelect(item.id || item._id) : openDetail(item)}
+            onclick={(e) => selectMode ? handleSelectClick(e, item) : openDetail(item)}
             oncontextmenu={(e) => handleContextMenu(e, item)}
+            ondblclick={() => { if (!selectMode && fileType === 'image') openLightbox(idx) }}
           >
             {#if selectMode}
               <div class="absolute top-1.5 left-1.5 z-10">
@@ -823,6 +1151,11 @@ function closeContextMenu() {
             </div>
             {#if !selectMode}
               <div class="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+                {#if fileType === 'image'}
+                  <button onclick={(e) => { e.stopPropagation(); openLightbox(idx) }} class="p-1 rounded-full bg-white/80 dark:bg-gray-700/80 shadow hover:bg-white dark:hover:bg-gray-600 transition-colors" title="全屏查看">
+                    <Icon icon="mdi:magnify-plus" width="12" height="12" class="text-gray-600 dark:text-gray-400" />
+                  </button>
+                {/if}
                 <button onclick={(e) => { e.stopPropagation(); openDetail(item) }} class="p-1 rounded-full bg-white/80 dark:bg-gray-700/80 shadow hover:bg-white dark:hover:bg-gray-600 transition-colors" title="编辑">
                   <Icon icon="mdi:pencil" width="12" height="12" class="text-gray-600 dark:text-gray-400" />
                 </button>
@@ -847,15 +1180,16 @@ function closeContextMenu() {
             </tr>
           </thead>
           <tbody>
-            {#each mediaList as item (item.id || item._id)}
+            {#each mediaList as item, idx (item.id || item._id)}
               {@const fileType = getFileType(item)}
               {@const fileUrl = getFileUrl(item)}
               {@const isSelected = selectedIds.has(item.id || item._id)}
               {@const isNew = isNewFile(item)}
               <tr
                 class="border-b border-gray-50 dark:border-gray-800/50 hover:bg-gray-50/50 dark:hover:bg-gray-800/50 cursor-pointer transition-colors {isSelected ? 'bg-blue-50/50 dark:bg-blue-900/20' : ''}"
-                onclick={() => selectMode ? toggleSelect(item.id || item._id) : openDetail(item)}
+                onclick={(e) => selectMode ? handleSelectClick(e, item) : openDetail(item)}
                 oncontextmenu={(e) => handleContextMenu(e, item)}
+                ondblclick={() => { if (!selectMode && fileType === 'image') openLightbox(idx) }}
               >
                 <td class="py-2 px-2.5">
                   <div class="flex items-center gap-2 min-w-0">
@@ -878,6 +1212,11 @@ function closeContextMenu() {
                 <td class="py-2 px-2.5 text-xs text-gray-400 dark:text-gray-500 hidden md:table-cell whitespace-nowrap">{formatDate(item.created_at)}</td>
                 <td class="py-2 px-2.5">
                   <div class="flex items-center justify-end gap-0.5">
+                    {#if fileType === 'image'}
+                      <button onclick={(e) => { e.stopPropagation(); openLightbox(idx) }} class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0" title="全屏查看">
+                        <Icon icon="mdi:magnify-plus" width="13" height="13" class="text-gray-400 dark:text-gray-500" />
+                      </button>
+                    {/if}
                     <button onclick={(e) => { e.stopPropagation(); openFile(item) }} class="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0" title="打开">
                       <Icon icon="mdi:open-in-new" width="13" height="13" class="text-gray-400 dark:text-gray-500" />
                     </button>
@@ -906,13 +1245,66 @@ function closeContextMenu() {
       <div class="flex items-center justify-between">
         <span class="text-xs text-gray-500 dark:text-gray-400">第 {page}/{totalPages} 页</span>
         <div class="flex gap-1.5">
-          <button onclick={() => { if (page > 1) { page--; loadData() } }} disabled={page <= 1} class="px-3 py-1 rounded-lg text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-700/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">上一页</button>
-          <button onclick={() => { if (page < totalPages) { page++; loadData() } }} disabled={page >= totalPages} class="px-3 py-1 rounded-lg text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-700/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">下一页</button>
+          <button onclick={() => { if (page > 1) { page--; loadData(); window.scrollTo({ top: 0, behavior: 'smooth' }) } }} disabled={page <= 1} class="px-3 py-1 rounded-lg text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-700/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">上一页</button>
+          <button onclick={() => { if (page < totalPages) { page++; loadData(); window.scrollTo({ top: 0, behavior: 'smooth' }) } }} disabled={page >= totalPages} class="px-3 py-1 rounded-lg text-xs border border-gray-200 dark:border-gray-700 bg-white/50 dark:bg-gray-800/50 hover:bg-white/70 dark:hover:bg-gray-700/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">下一页</button>
         </div>
       </div>
     {/if}
   {/if}
 </div>
+
+{#if showLightbox && mediaList[lightboxIdx]}
+  {@const lbItem = mediaList[lightboxIdx]}
+  {@const lbUrl = getFileUrl(lbItem)}
+  <div
+    class="fixed inset-0 z-[70] bg-black/90 flex items-center justify-center select-none"
+    onclick={closeLightbox}
+    onwheel={handleLightboxWheel}
+  >
+    <div class="absolute top-3 left-3 z-10 flex items-center gap-2">
+      <span class="text-xs text-white/60">{lightboxIdx + 1}/{mediaList.length}</span>
+      <span class="text-xs text-white/40">{lbItem.filename}</span>
+    </div>
+    <div class="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+      <button onclick={(e) => { e.stopPropagation(); lightboxZoom = 1; lightboxPan = { x: 0, y: 0 } }} class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white/70" title="重置缩放 (0)">
+        <Icon icon="mdi:magnify" width="16" height="16" />
+      </button>
+      <span class="text-xs text-white/50 min-w-[3rem] text-center">{Math.round(lightboxZoom * 100)}%</span>
+      <button onclick={(e) => { e.stopPropagation(); downloadFile(lbItem) }} class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white/70" title="下载">
+        <Icon icon="mdi:download" width="16" height="16" />
+      </button>
+      <button onclick={closeLightbox} class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white/70" title="关闭 (Esc)">
+        <Icon icon="mdi:close" width="16" height="16" />
+      </button>
+    </div>
+    <div
+      class="max-w-[90vw] max-h-[85vh] flex items-center justify-center"
+      onclick={(e) => e.stopPropagation()}
+      onmousedown={handleLightboxMouseDown}
+      onmousemove={handleLightboxMouseMove}
+      onmouseup={handleLightboxMouseUp}
+      onmouseleave={handleLightboxMouseUp}
+    >
+      <img
+        src={lbUrl}
+        alt={lbItem.filename}
+        class="max-w-full max-h-[85vh] object-contain transition-transform"
+        style="transform: scale({lightboxZoom}) translate({lightboxPan.x / lightboxZoom}px, {lightboxPan.y / lightboxZoom}px); cursor: {lightboxZoom > 1 ? 'grab' : 'zoom-in'}"
+        draggable="false"
+      />
+    </div>
+    {#if lightboxIdx > 0}
+      <button onclick={(e) => { e.stopPropagation(); navigateLightbox(-1) }} class="absolute left-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white/70" title="上一张 (←)">
+        <Icon icon="mdi:chevron-left" width="24" height="24" />
+      </button>
+    {/if}
+    {#if lightboxIdx < mediaList.length - 1}
+      <button onclick={(e) => { e.stopPropagation(); navigateLightbox(1) }} class="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white/70" title="下一张 (→)">
+        <Icon icon="mdi:chevron-right" width="24" height="24" />
+      </button>
+    {/if}
+  </div>
+{/if}
 
 {#if showDetail && selectedMedia}
   {@const detailType = getFileType(selectedMedia)}
@@ -932,7 +1324,12 @@ function closeContextMenu() {
           </div>
           <div class="min-w-0 flex-1">
             <p class="text-sm font-medium truncate text-gray-900 dark:text-gray-100">{selectedMedia.filename}</p>
-            <p class="text-xs text-gray-400 dark:text-gray-500">{formatSize(selectedMedia.size)} · {selectedMedia.mime_type || '-'}</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500">
+              {formatSize(selectedMedia.size)} · {selectedMedia.mime_type || '-'}
+              {#if imageDimensions}
+                · {imageDimensions.width}×{imageDimensions.height}px
+              {/if}
+            </p>
           </div>
           <div class="flex items-center gap-1 shrink-0">
             <button onclick={() => navigateDetail(-1)} disabled={!hasPrev} class="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-30 disabled:cursor-not-allowed transition-colors" title="上一个 (←)">
@@ -946,6 +1343,15 @@ function closeContextMenu() {
         </div>
         <div class="bg-gray-100/50 dark:bg-gray-700/30 rounded-xl overflow-hidden relative">
           <div class="absolute top-2 right-2 z-10 flex gap-1">
+            {#if detailType === 'image'}
+              <button
+                onclick={() => { closeDetail(); openLightbox(detailIdx) }}
+                class="p-1 rounded-lg bg-white/80 dark:bg-gray-700/80 shadow hover:bg-white dark:hover:bg-gray-600 transition-colors"
+                title="全屏查看"
+              >
+                <Icon icon="mdi:magnify-plus" width="14" height="14" class="text-gray-600 dark:text-gray-300" />
+              </button>
+            {/if}
             <button
               onclick={() => detailPreviewMode = !detailPreviewMode}
               class="p-1 rounded-lg bg-white/80 dark:bg-gray-700/80 shadow hover:bg-white dark:hover:bg-gray-600 transition-colors"
@@ -1078,6 +1484,15 @@ function closeContextMenu() {
     style="left: {contextMenu.x}px; top: {contextMenu.y}px"
     onclick={(e) => e.stopPropagation()}
   >
+    {#if getFileType(contextMenu.item) === 'image'}
+      <button
+        onclick={() => { const idx = mediaList.findIndex(m => (m.id || m._id) === (contextMenu.item.id || contextMenu.item._id)); closeContextMenu(); if (idx >= 0) openLightbox(idx) }}
+        class="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+      >
+        <Icon icon="mdi:magnify-plus" width="14" height="14" class="text-gray-400 dark:text-gray-500" />
+        全屏查看
+      </button>
+    {/if}
     <button
       onclick={() => { openFile(contextMenu.item); closeContextMenu() }}
       class="w-full px-3 py-1.5 text-left text-xs text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
