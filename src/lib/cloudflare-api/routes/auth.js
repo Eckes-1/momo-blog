@@ -120,27 +120,44 @@ function generateCaptchaSvg(text) {
   const width = 220
   const height = 60
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">`
-  svg += `<rect width="${width}" height="${height}" fill="#f0f0f0" rx="8"/>`
-  for (let i = 0; i < 5; i++) {
+  svg += `<rect width="${width}" height="${height}" fill="#e8e8e8" rx="8"/>`
+  for (let i = 0; i < 12; i++) {
     const x1 = Math.random() * width
     const y1 = Math.random() * height
     const x2 = Math.random() * width
     const y2 = Math.random() * height
-    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(${Math.floor(Math.random()*150)},${Math.floor(Math.random()*150)},${Math.floor(Math.random()*150)},0.3)" stroke-width="1"/>`
+    const sw = Math.random() * 2 + 0.5
+    svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="rgba(${Math.floor(Math.random()*200)},${Math.floor(Math.random()*200)},${Math.floor(Math.random()*200)},0.5)" stroke-width="${sw}"/>`
   }
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 3; i++) {
     const cx = Math.random() * width
     const cy = Math.random() * height
-    const r = Math.random() * 2 + 1
-    svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(${Math.floor(Math.random()*150)},${Math.floor(Math.random()*150)},${Math.floor(Math.random()*150)},0.3)"/>`
+    const rx = Math.random() * 40 + 20
+    const ry = Math.random() * 20 + 10
+    svg += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="none" stroke="rgba(${Math.floor(Math.random()*200)},${Math.floor(Math.random()*200)},${Math.floor(Math.random()*200)},0.25)" stroke-width="${Math.random()*2+0.5}"/>`
   }
-  const colors = ['#2d5a8e', '#8e2d5a', '#5a8e2d', '#8e5a2d', '#2d8e5a', '#5a2d8e']
+  for (let i = 0; i < 80; i++) {
+    const cx = Math.random() * width
+    const cy = Math.random() * height
+    const r = Math.random() * 2.5 + 0.5
+    svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(${Math.floor(Math.random()*200)},${Math.floor(Math.random()*200)},${Math.floor(Math.random()*200)},0.4)"/>`
+  }
+  const colors = ['#2d5a8e', '#8e2d5a', '#5a8e2d', '#8e5a2d', '#2d8e5a', '#5a2d8e', '#8e3d2d', '#2d8e8e']
   for (let i = 0; i < text.length; i++) {
     const x = 20 + i * 32
-    const y = 38 + (Math.random() - 0.5) * 10
-    const rotate = (Math.random() - 0.5) * 20
+    const y = 38 + (Math.random() - 0.5) * 14
+    const rotate = (Math.random() - 0.5) * 30
     const color = colors[Math.floor(Math.random() * colors.length)]
-    svg += `<text x="${x}" y="${y}" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="${color}" transform="rotate(${rotate} ${x} ${y})">${text[i]}</text>`
+    const skewX = (Math.random() - 0.5) * 10
+    svg += `<text x="${x}" y="${y}" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="${color}" transform="rotate(${rotate} ${x} ${y}) skewX(${skewX})" style="filter: url(#blur)">${text[i]}</text>`
+  }
+  svg += `<defs><filter id="blur"><feGaussianBlur in="SourceGraphic" stdDeviation="0.5"/></filter></defs>`
+  for (let i = 0; i < 4; i++) {
+    const x1 = Math.random() * width
+    const y1 = Math.random() * height
+    const x2 = Math.random() * width
+    const y2 = Math.random() * height
+    svg += `<path d="M${x1},${y1} Q${Math.random()*width},${Math.random()*height} ${x2},${y2}" fill="none" stroke="rgba(${Math.floor(Math.random()*200)},${Math.floor(Math.random()*200)},${Math.floor(Math.random()*200)},0.4)" stroke-width="${Math.random()*2+1}"/>`
   }
   svg += `</svg>`
   return svg
