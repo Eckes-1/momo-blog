@@ -271,7 +271,7 @@ const toolbarActions = [
   { icon: 'mdi:format-bold', title: '加粗 (Ctrl+B)', action: () => insertMarkdown('**', '**', '粗体文字') },
   { icon: 'mdi:format-italic', title: '斜体 (Ctrl+I)', action: () => insertMarkdown('*', '*', '斜体文字') },
   { icon: 'mdi:format-strikethrough', title: '删除线', action: () => insertMarkdown('~~', '~~', '删除线文字') },
-  { icon: 'mdi:format-highlight', title: '高亮', action: () => insertMarkdown('==', '==', '高亮文字') },
+  { icon: 'mdi:format-color-highlight', title: '高亮', action: () => insertMarkdown('==', '==', '高亮文字') },
   { icon: 'mdi:code-tags', title: '行内代码', action: () => insertMarkdown('`', '`', 'code') },
   { icon: 'mdi:code-braces', title: '代码块', action: () => insertMarkdown('\n```\n', '\n```\n', '代码') },
   { icon: 'mdi:link-variant', title: '链接 (Ctrl+K)', action: () => insertMarkdown('[', '](url)', '链接文字') },
@@ -502,7 +502,7 @@ let seoUrl = $derived(`momo-blog.pages.dev/blog/${slug || 'post-slug'}`)
     <div class="text-gray-400 dark:text-gray-500">加载中...</div>
   </div>
 {:else}
-  <div class="space-y-4 {fullscreen ? 'fixed inset-0 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl p-4 overflow-y-auto' : ''}">
+  <div class="{fullscreen ? 'fixed inset-0 z-[100] bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl p-4 overflow-y-auto' : ''} space-y-4">
     <div class="flex items-center justify-between flex-wrap gap-2">
       <div class="flex items-center gap-3">
         {#if fullscreen}
@@ -618,12 +618,12 @@ let seoUrl = $derived(`momo-blog.pages.dev/blog/${slug || 'post-slug'}`)
           </div>
 
           {#if !showPreview}
-            <div class="flex items-center gap-0.5 flex-wrap">
+            <div class="flex items-center gap-0.5 flex-wrap max-w-full">
               {#each toolbarActions as btn}
                 <button
                   onclick={btn.action}
                   title={btn.title}
-                  class="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                  class="p-1.5 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-300 transition-colors shrink-0"
                 >
                   <Icon icon={btn.icon} width="18" height="18" />
                 </button>
