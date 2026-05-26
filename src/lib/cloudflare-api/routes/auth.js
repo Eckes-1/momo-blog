@@ -243,7 +243,7 @@ export function registerAuthRoutes(app) {
       const token = jwt.sign(
         { id: user.id, username: user.username },
         c.env.JWT_SECRET,
-        { expiresIn: '30m' }
+        { expiresIn: '1h' }
       )
 
       return c.json({ token, user: { id: user.id, username: user.username } })
@@ -260,7 +260,7 @@ export function registerAuthRoutes(app) {
       const token = jwt.sign(
         { id: user.id, username: user.username },
         c.env.JWT_SECRET,
-        { expiresIn: '30m' }
+        { expiresIn: '1h' }
       )
       return c.json({ token, user: { id: user.id, username: user.username } })
     } catch (err) {
@@ -300,7 +300,7 @@ export function registerAuthRoutes(app) {
       const token = jwt.sign(
         { id: userId, username },
         c.env.JWT_SECRET,
-        { expiresIn: '30m' }
+        { expiresIn: '1h' }
       )
 
       return c.json({ token, user: { id: userId, username } }, 201)

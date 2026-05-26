@@ -2,7 +2,7 @@ import { getToken, setToken, setUser, addToast } from './stores.svelte.js'
 
 const BASE = '/api'
 const TIMEOUT = 30000
-const SESSION_DURATION = 30 * 60 * 1000
+const SESSION_DURATION = 60 * 60 * 1000
 const RENEW_THRESHOLD = 5 * 60 * 1000
 const WARN_THRESHOLD = 5 * 60 * 1000
 
@@ -124,7 +124,7 @@ function scheduleTimers() {
       const success = await tryRefreshToken()
       if (success) {
         hasWarned = false
-        addToast('会话已自动续期 30 分钟', 'success')
+        addToast('会话已自动续期 1 小时', 'success')
         scheduleTimers()
       } else {
         handleSessionExpired()
@@ -216,7 +216,7 @@ async function request(path, options = {}, timeout = TIMEOUT) {
         if (success) {
           scheduleTimers()
           if (!hasWarned) {
-            addToast('会话已自动续期 30 分钟', 'success')
+            addToast('会话已自动续期 1 小时', 'success')
           }
           hasWarned = false
         }
