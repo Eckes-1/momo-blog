@@ -44,7 +44,7 @@ The primary configuration files for the website are `astro.config.mjs` and `src/
     * `PohotSwipe`: Enable PhotoSwipe
 
 :::tip
-For the backend project, refer to [momo-blog](https://github.com/Eckes-1/momo-blog). Ensure all configurations are completed as specified, particularly for cross-domain domains.
+For the backend project, refer to [lihui-blog](https://github.com/Eckes-1/lihui-blog). Ensure all configurations are completed as specified, particularly for cross-domain domains.
 :::
 
 #### `profileConfig`

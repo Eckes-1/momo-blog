@@ -33,7 +33,7 @@ $E = mc^2$
 
 ### Github 卡片
 
-::github{repo="Eckes-1/momo-blog"}
+::github{repo="Eckes-1/lihui-blog"}
 
 ## 特殊语法
 

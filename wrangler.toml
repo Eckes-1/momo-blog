@@ -4,8 +4,8 @@ compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "momo-db"
-database_id = "79ec6be0-acb9-40a9-b94f-f2b98ed0cfb7"
+database_name = "lihui-db"
+database_id = "aa5cf546-2dc2-4120-aed0-b3665eed29ec"
 
 [[send_email]]
 name = "EMAIL"

@@ -12,7 +12,7 @@ pinTop: 1
 
 该项目目前仍处于维护中，如果需要更新，请按照以下步骤进行：
 
-首先在 `package.json` 中确认版本号，或者在这里或 [Release](https://github.com/Eckes-1/momo-blog/releases) 中查看改动记录认。
+首先在 `package.json` 中确认版本号，或者在这里或 [Release](https://github.com/Eckes-1/lihui-blog/releases) 中查看改动记录认。
 
 当只有项目的配置文件的结构修改后，才会对项目的版本号进行修改。项目配置文件即和网站布局内容相关的文件，包括`astro.config.mjs`、`src/config.ts`、`src/content.config.ts`、`src/i18n/`文件夹下的文件。
 

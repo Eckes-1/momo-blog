@@ -8,9 +8,9 @@ draft: false
 slugId: lihui/intro/comment
 ---
 
-LiHui Blog supports adding comment functionality and offers two deployment methods, including serverless deployment. For details, visit the repository [lihui-blog](https://github.com/Eckes-1/momo-blog).
+LiHui Blog supports adding comment functionality and offers two deployment methods, including serverless deployment. For details, visit the repository [lihui-blog](https://github.com/Eckes-1/lihui-blog).
 
-::github{repo="Eckes-1/momo-blog"}
+::github{repo="Eckes-1/lihui-blog"}
 
 ## Configuration
 
@@ -24,7 +24,7 @@ The comment component is written in Svelte. Similar to most comment systems, use
 
 ## Custom Frontend
 
-If you need to use the comment feature in other projects, you can directly import it via CDN. The usage method is as follows. For details, please refer to the repository [lihui-blog](https://github.com/Eckes-1/momo-blog).
+If you need to use the comment feature in other projects, you can directly import it via CDN. The usage method is as follows. For details, please refer to the repository [lihui-blog](https://github.com/Eckes-1/lihui-blog).
 
 ```html
 <div id="lihui-comment"></div>

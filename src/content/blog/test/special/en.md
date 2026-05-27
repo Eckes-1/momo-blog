@@ -33,7 +33,7 @@ $E = mc^2$
 
 ### Github Card
 
-::github{repo="Eckes-1/momo-blog"}
+::github{repo="Eckes-1/lihui-blog"}
 
 ## Special Syntax
 

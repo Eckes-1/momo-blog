@@ -15,4 +15,4 @@ slugId: lihui/test/card
 
 ## Github Card
 
-::github{repo="Eckes-1/momo-blog"}
+::github{repo="Eckes-1/lihui-blog"}

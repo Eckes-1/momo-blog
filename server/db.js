@@ -9,7 +9,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 mkdirSync(`${__dirname}/data`, { recursive: true })
 mkdirSync(`${__dirname}/uploads`, { recursive: true })
 
-const db = new Database(`${__dirname}/data/momo.db`)
+const db = new Database(`${__dirname}/data/lihui.db`)
 
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')

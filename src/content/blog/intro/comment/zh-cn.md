@@ -8,9 +8,9 @@ draft: false
 slugId: lihui/intro/comment
 ---
 
-LiHui Blog 支持添加评论功能，并提供两种部署方式，支持零服务器部署。详情访问仓库[lihui-blog](https://github.com/Eckes-1/momo-blog)。
+LiHui Blog 支持添加评论功能，并提供两种部署方式，支持零服务器部署。详情访问仓库[lihui-blog](https://github.com/Eckes-1/lihui-blog)。
 
-::github{repo="Eckes-1/momo-blog"}
+::github{repo="Eckes-1/lihui-blog"}
 
 ## 配置
 
@@ -24,7 +24,7 @@ LiHui Blog 支持添加评论功能，并提供两种部署方式，支持零服
 
 ## 自定义前端
 
-如果需要在其他项目里面使用评论功能可以直接通过 CDN 引入，使用方法如下，具体可以参考仓库[lihui-blog](https://github.com/Eckes-1/momo-blog)。
+如果需要在其他项目里面使用评论功能可以直接通过 CDN 引入，使用方法如下，具体可以参考仓库[lihui-blog](https://github.com/Eckes-1/lihui-blog)。
 
 ```html
 <div id="lihui-comment"></div>

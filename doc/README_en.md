@@ -24,8 +24,8 @@ LiHui Blog — "Li" signifies taking firm root, "Hui" signifies radiating brilli
 
 1. Clone this project
     ```bash
-    git clone https://github.com/Eckes-1/momo-blog.git
-    cd momo-blog
+    git clone https://github.com/Eckes-1/lihui-blog.git
+    cd lihui-blog
     ```
 2. Run `pnpm install` to install dependencies (use `npm install -g pnpm` to install `pnpm`)
 3. Run `pnpm dev` to start the development server

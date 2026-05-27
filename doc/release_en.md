@@ -2,7 +2,7 @@
 
 This project is currently under active maintenance. To update, follow these steps:
 
-First, verify the version number in `package.json` or review the changelog here or at [Release](https://github.com/Eckes-1/momo-blog/releases).
+First, verify the version number in `package.json` or review the changelog here or at [Release](https://github.com/Eckes-1/lihui-blog/releases).
 
 The project version number is only incremented when the configuration file structure undergoes structural changes. Project configuration files refer to those related to website layout and content, including `astro.config.mjs`, `src/config.ts`, `src/content.config.ts`, and files within the `src/i18n/` folder.
 

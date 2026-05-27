@@ -35,7 +35,7 @@
     * `LQIP`: 是否启用LQIP
     * `PohotSwipe`: 是否启用图片灯箱模式
 
-> 后端项目参考[lihui-blog](https://github.com/Eckes-1/momo-blog)进行部署，一定需要按照要求进行配置，尤其是跨域的域名认证
+> 后端项目参考[lihui-blog](https://github.com/Eckes-1/lihui-blog)进行部署，一定需要按照要求进行配置，尤其是跨域的域名认证
 
 #### `profileConfig`
 
