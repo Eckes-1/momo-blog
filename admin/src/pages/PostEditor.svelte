@@ -427,6 +427,7 @@ const toolbarActions = [
   { type: 'separator' },
   { icon: 'mdi:emoticon-outline', title: 'Emoji', action: () => showEmojiPicker = !showEmojiPicker },
   { icon: 'mdi:omega', title: '特殊字符', action: () => showSpecialChars = !showSpecialChars },
+  { icon: 'mdi:history', title: '版本历史', action: () => { loadRevisions(); showRevisions = true } },
   { icon: 'mdi:find-replace', title: '查找替换 (Ctrl+H)', action: () => { showFindReplace = !showFindReplace; if (showFindReplace) findInContent() } },
 ]
 
