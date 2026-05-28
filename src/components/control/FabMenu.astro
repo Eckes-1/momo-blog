@@ -11,8 +11,8 @@ interface Props {
   showBackTop?: boolean;
   showBackBottom?: boolean;
   showComment?: boolean;
-  scrollToTopDistance?: number; // 滚动多少高度后显示菜单
-  headings?: MarkdownHeading[]; // 接收 Astro 解析出来的目录数组
+  scrollToTopDistance?: number;
+  headings?: MarkdownHeading[];
 }
 
 const { 
@@ -23,16 +23,15 @@ const {
   headings = [] 
 } = Astro.props;
 
-// 过滤掉 h1 (通常是文章标题) 和层级过深的标题，保留 h2, h3, h4
 const tocHeadings = headings.filter(h => h.depth > 1 && h.depth < 5);
 ---
 
 <div 
   id="fabMenu" 
-  class="fixed bottom-[5vh] lg:bottom-[13.5vh] right-[7vw] lg:left-[var(--toc-offset-left)] w-10 h-10 z-[1000] transition-opacity duration-300 opacity-0 pointer-events-none"
+  class="fixed bottom-[5vh] lg:bottom-[13.5vh] right-[7vw] lg:left-[var(--toc-offset-left)] flex flex-col items-center gap-3 z-[1000] transition-opacity duration-300 opacity-0 pointer-events-none"
   data-scroll-distance={scrollToTopDistance}
 >
-  <div id="menuItems" class="absolute bottom-full left-0 mb-3 flex flex-col items-center gap-3 transition-all duration-300 ease-out translate-y-10 opacity-0 pointer-events-none [.is-active_&]:translate-y-0 [.is-active_&]:opacity-100 [.is-active_&]:pointer-events-auto">
+  <div id="menuItems" class="flex flex-col items-center gap-3 transition-all duration-300 ease-out translate-y-10 opacity-0 pointer-events-none [.is-active_&]:translate-y-0 [.is-active_&]:opacity-100 [.is-active_&]:pointer-events-auto">
     
     {showBackTop && (
       <button id="backTop" title={t("button.backToTop")} class="relative w-10 h-10 rounded-full border border-[var(--text-color)]/20 cursor-pointer flex items-center justify-center transition-transform duration-200 active:scale-90 shadow-none backdrop-blur bg-[var(--bg-color)]/20 hover:bg-[var(--button-hover-color)]">
@@ -70,10 +69,69 @@ const tocHeadings = headings.filter(h => h.depth > 1 && h.depth < 5);
     )}
   </div>
 
-  <button id="menuTrigger" title={t("button.meun")} class="w-full h-full rounded-full border border-[var(--text-color)]/20 cursor-pointer flex items-center justify-center transition-all duration-300 shadow-none backdrop-blur bg-[var(--bg-color)]/20 active:scale-95 hover:bg-[var(--button-hover-color)]">
+  <button id="menuTrigger" title={t("button.meun")} class="w-10 h-10 rounded-full border border-[var(--text-color)]/20 cursor-pointer flex items-center justify-center transition-all duration-300 shadow-none backdrop-blur bg-[var(--bg-color)]/20 active:scale-95 hover:bg-[var(--button-hover-color)]">
     <Icon name="fa6-solid:ellipsis" class="absolute text-lg text-[var(--text-color)] transition-all duration-300 opacity-100 rotate-0 [.is-active_&]:opacity-0 [.is-active_&]:rotate-90" />
     <Icon name="fa6-solid:xmark" class="absolute text-lg text-[var(--text-color)] transition-all duration-300 opacity-0 -rotate-90 [.is-active_&]:opacity-100 [.is-active_&]:rotate-0" />
   </button>
+
+  <button id="musicTrigger" title="音乐播放器" class="w-10 h-10 rounded-full border border-[var(--text-color)]/20 cursor-pointer flex items-center justify-center transition-all duration-200 active:scale-90 shadow-none backdrop-blur bg-[var(--bg-color)]/20 hover:bg-[var(--button-hover-color)] hidden">
+    <svg id="musicIcon" viewBox="0 0 24 24" fill="currentColor" class="w-[18px] h-[18px] text-[var(--text-color)]">
+      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+    </svg>
+  </button>
+
+  <div id="musicPanel" class="absolute bottom-[calc(100%+12px)] right-0 w-[300px] max-h-[460px] bg-[var(--bg-color)]/95 backdrop-blur-lg border border-[var(--text-color)]/20 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-bottom-right scale-50 opacity-0 pointer-events-none translate-y-4 [.music-active_&]:scale-100 [.music-active_&]:opacity-100 [.music-active_&]:pointer-events-auto [.music-active_&]:translate-y-0 z-[1001]">
+    <div class="flex items-center gap-3 px-4 py-3">
+      <div id="musicCover" class="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-gray-400 flex items-center justify-center">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-white/90">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div id="musicTitle" class="text-sm font-semibold text-[var(--text-color)] truncate">未选择歌曲</div>
+        <div id="musicArtist" class="text-xs text-[var(--text-color)]/50 truncate">未知艺术家</div>
+      </div>
+      <button id="closeMusic" class="w-6 h-6 rounded-full flex items-center justify-center text-[var(--text-color)]/40 hover:text-[var(--text-color)] hover:bg-[var(--button-hover-color)] transition-all">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-3.5 h-3.5"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>
+    </div>
+    <div id="musicProgress" class="px-4 cursor-pointer">
+      <div class="relative w-full h-1 bg-[var(--text-color)]/10 rounded-full">
+        <div id="musicProgressBar" class="absolute top-0 left-0 h-full bg-[var(--link-color)] rounded-full" style="width:0%"></div>
+      </div>
+      <div class="flex justify-between mt-1 text-[10px] text-[var(--text-color)]/40 font-mono">
+        <span id="musicCurrentTime">0:00</span>
+        <span id="musicDuration">0:00</span>
+      </div>
+    </div>
+    <div class="flex items-center justify-center gap-1 px-4 py-2">
+      <button id="musicMode" class="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-color)]/50 hover:text-[var(--text-color)] hover:bg-[var(--button-hover-color)] transition-all" title="列表循环">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+      </button>
+      <button id="musicPrev" class="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-color)] hover:bg-[var(--button-hover-color)] transition-all" title="上一首">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+      </button>
+      <button id="musicPlay" class="w-9 h-9 rounded-full flex items-center justify-center bg-[var(--link-color)] text-white hover:opacity-85 transition-all" title="播放">
+        <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button id="musicNext" class="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-color)] hover:bg-[var(--button-hover-color)] transition-all" title="下一首">
+        <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+      </button>
+      <button id="musicMute" class="w-8 h-8 rounded-full flex items-center justify-center text-[var(--text-color)]/50 hover:text-[var(--text-color)] hover:bg-[var(--button-hover-color)] transition-all" title="音量">
+        <svg id="volumeIcon" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+      </button>
+    </div>
+    <div id="musicVolumeBar" class="px-4 pb-1 cursor-pointer">
+      <div class="relative w-full h-[3px] bg-[var(--text-color)]/10 rounded-full">
+        <div id="musicVolumeFill" class="absolute top-0 left-0 h-full bg-[var(--link-color)] rounded-full" style="width:70%"></div>
+      </div>
+    </div>
+    <div class="flex items-center justify-between px-4 py-1.5 border-t border-[var(--text-color)]/10">
+      <span class="text-xs font-semibold text-[var(--text-color)]">播放列表</span>
+      <span id="musicCount" class="text-[10px] text-[var(--text-color)]/40">0 首</span>
+    </div>
+    <div id="musicList" class="overflow-y-auto overscroll-contain max-h-[180px] p-1"></div>
+  </div>
 
   {tocHeadings.length > 0 && (
     <div 
@@ -127,23 +185,20 @@ function initFabMenu() {
     const scrollTop = window.scrollY || document.documentElement.scrollTop;
     const docHeight = document.documentElement.scrollHeight - document.documentElement.clientHeight;
     
-    // 控制 FAB 整体显示/隐藏
     if (scrollTop > threshold) {
       container.classList.remove('opacity-0', 'pointer-events-none');
       container.classList.add('opacity-100', 'pointer-events-auto');
     } else {
       container.classList.add('opacity-0', 'pointer-events-none');
-      container.classList.remove('opacity-100', 'pointer-events-auto', 'is-active', 'toc-active');
-      isTocOpen = false; // 回到顶部时同时关闭目录状态
+      container.classList.remove('opacity-100', 'pointer-events-auto', 'is-active', 'toc-active', 'music-active');
+      isTocOpen = false;
     }
 
-    // 滑动页面时平滑关闭目录 (设置 50px 的缓冲阈值，防止误触)
     if (isTocOpen && Math.abs(scrollTop - scrollPosOnTocOpen) > 50) {
       isTocOpen = false;
       container.classList.remove('toc-active');
     }
 
-    // 更新进度条
     if (progressCircle && docHeight > 0) {
       const scrollPercent = Math.min(100, (scrollTop / docHeight) * 100);
       const circumference = 2 * Math.PI * 19;
@@ -152,31 +207,26 @@ function initFabMenu() {
     }
   };
 
-  // 主按钮切换
   trigger.onclick = (e) => {
     e.stopPropagation();
     container.classList.toggle('is-active');
-    // 如果关闭了主菜单，也一并关闭目录
     if (!container.classList.contains('is-active')) {
       isTocOpen = false;
       container.classList.remove('toc-active');
     }
   };
 
-  // 目录按钮触发
   if (tocTrigger) {
     tocTrigger.onclick = (e) => {
       e.stopPropagation();
       isTocOpen = !isTocOpen;
       container.classList.toggle('toc-active', isTocOpen);
-      // 记录打开目录时的滚动位置
       if (isTocOpen) {
         scrollPosOnTocOpen = window.scrollY || document.documentElement.scrollTop;
       }
     };
   }
 
-  // 关闭目录按钮
   if (closeToc) {
     closeToc.onclick = (e) => {
       e.stopPropagation();
@@ -185,73 +235,53 @@ function initFabMenu() {
     };
   }
 
-tocLinks.forEach(link => {
+  tocLinks.forEach(link => {
     link.onclick = (e) => {
-      e.preventDefault(); // 阻止默认的锚点跳转，以便使用平滑滚动
-      
-      // 点击即时反馈：移除所有高亮，给当前点击的项加上高亮
+      e.preventDefault();
       tocLinks.forEach(l => l.classList.remove('is-active'));
       link.classList.add('is-active');
-
       const href = link.getAttribute('href');
       if (!href) return;
       const targetId = href.substring(1);
       const targetElement = document.getElementById(targetId);
-      
       if (targetElement) {
-        // 考虑到可能有顶部导航栏，预留一点偏移量（可选，比如 60px）
         const offset = 60; 
         const bodyRect = document.body.getBoundingClientRect().top;
         const elementRect = targetElement.getBoundingClientRect().top;
         const elementPosition = elementRect - bodyRect;
         const offsetPosition = elementPosition - offset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
-        });
-        
-        // 缩起目录面板
+        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
         isTocOpen = false;
         container.classList.remove('toc-active');
       }
     };
   });
 
-  // 提取所有正文里的标题元素
   const headingElements = Array.from(tocLinks)
     .map(link => document.getElementById(link.getAttribute('href').substring(1)))
-    .filter(Boolean); // 过滤掉不存在的元素
+    .filter(Boolean);
 
   if (headingElements.length > 0) {
-    // 设置观察器参数：当标题进入视窗顶部向下 10% 到 20% 的区域时触发
     const observerOptions = {
       root: null,
       rootMargin: '-10% 0px -80% 0px', 
       threshold: 0
     };
-
     const tocObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          // 清除所有高亮
           tocLinks.forEach(l => l.classList.remove('is-active'));
-          // 找到当前对应的目录链接并高亮
           const activeId = entry.target.id;
           const activeLink = document.querySelector(`.toc-link[href="#${activeId}"]`);
           if (activeLink) {
             activeLink.classList.add('is-active');
-            // activeLink.scrollIntoView({ block: 'nearest' });
           }
         }
       });
     }, observerOptions);
-
-    // 开始观察所有标题
     headingElements.forEach(el => tocObserver.observe(el));
   }
 
-  // 回到顶部
   if (backTop) {
     backTop.onclick = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -260,7 +290,6 @@ tocLinks.forEach(link => {
     };
   }
 
-  // 回到底部
   if (backBottom) {
     backBottom.onclick = () => {
       window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
@@ -269,7 +298,6 @@ tocLinks.forEach(link => {
     };
   }
 
-  // 回到评论区
   if (backComment) {
     backComment.onclick = () => {
       const comments = document.getElementById('comments');
@@ -279,16 +307,283 @@ tocLinks.forEach(link => {
     };
   }
 
-  // 点击外部关闭所有展开项
   document.addEventListener('click', (e) => {
     if (!container.contains(e.target)) {
-      container.classList.remove('is-active', 'toc-active');
+      container.classList.remove('is-active', 'toc-active', 'music-active');
       isTocOpen = false;
     }
   });
 
   window.addEventListener('scroll', handleScroll, { passive: true });
   handleScroll();
+
+  // Music Player
+  initMusicPlayer(container);
+}
+
+function initMusicPlayer(container) {
+  const musicTrigger = document.getElementById('musicTrigger');
+  const musicPanel = document.getElementById('musicPanel');
+  const closeMusic = document.getElementById('closeMusic');
+  const musicPlay = document.getElementById('musicPlay');
+  const musicPrev = document.getElementById('musicPrev');
+  const musicNext = document.getElementById('musicNext');
+  const musicMode = document.getElementById('musicMode');
+  const musicMute = document.getElementById('musicMute');
+  const musicProgress = document.getElementById('musicProgress');
+  const musicProgressBar = document.getElementById('musicProgressBar');
+  const musicVolumeBar = document.getElementById('musicVolumeBar');
+  const musicVolumeFill = document.getElementById('musicVolumeFill');
+  const musicTitle = document.getElementById('musicTitle');
+  const musicArtist = document.getElementById('musicArtist');
+  const musicCover = document.getElementById('musicCover');
+  const musicCurrentTime = document.getElementById('musicCurrentTime');
+  const musicDuration = document.getElementById('musicDuration');
+  const musicList = document.getElementById('musicList');
+  const musicCount = document.getElementById('musicCount');
+  const playIcon = document.getElementById('playIcon');
+  const volumeIcon = document.getElementById('volumeIcon');
+  const musicIcon = document.getElementById('musicIcon');
+
+  let songs = [];
+  let currentIndex = -1;
+  let isPlaying = false;
+  let playMode = 'sequence';
+  let volume = 0.7;
+  let audio = window.__fabAudio;
+  if (!audio) {
+    audio = new Audio();
+    audio.preload = 'metadata';
+    window.__fabAudio = audio;
+  }
+
+  const savedVolume = localStorage.getItem('music-volume');
+  if (savedVolume !== null) {
+    volume = parseFloat(savedVolume);
+    audio.volume = volume;
+    if (musicVolumeFill) musicVolumeFill.style.width = (volume * 100) + '%';
+  }
+  const savedMode = localStorage.getItem('music-play-mode');
+  if (savedMode) { playMode = savedMode; updateModeIcon(); }
+
+  function formatTime(s) {
+    if (!s || isNaN(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  function getCoverColor(str) {
+    if (!str) return '#6b7280';
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    const h = ((hash % 360) + 360) % 360;
+    return 'hsl(' + h + ', 45%, 45%)';
+  }
+
+  function updateModeIcon() {
+    if (!musicMode) return;
+    const titles = { sequence: '列表循环', single: '单曲循环', shuffle: '随机播放' };
+    musicMode.title = titles[playMode] || '列表循环';
+    if (playMode === 'single') {
+      musicMode.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/><text x="12" y="15" text-anchor="middle" font-size="7" font-weight="bold" fill="currentColor">1</text></svg>';
+    } else if (playMode === 'shuffle') {
+      musicMode.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>';
+    } else {
+      musicMode.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>';
+    }
+  }
+
+  function updateVolumeIcon() {
+    if (!volumeIcon) return;
+    if (volume === 0) {
+      volumeIcon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+    } else if (volume < 0.5) {
+      volumeIcon.innerHTML = '<path d="M18.5 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM5 9v6h4l5 5V4L9 9H5z"/>';
+    } else {
+      volumeIcon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+    }
+  }
+
+  function updatePlayIcon() {
+    if (!playIcon) return;
+    if (isPlaying) {
+      playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+      musicPlay.title = '暂停';
+      if (musicIcon) musicIcon.classList.add('music-pulse');
+    } else {
+      playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+      musicPlay.title = '播放';
+      if (musicIcon) musicIcon.classList.remove('music-pulse');
+    }
+  }
+
+  function renderList() {
+    if (!musicList) return;
+    musicList.innerHTML = '';
+    songs.forEach((song, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'flex items-center gap-2 w-full px-3 py-1.5 border-none bg-transparent cursor-pointer text-left transition-colors hover:bg-[var(--button-hover-color)] ' + (i === currentIndex ? 'bg-[var(--button-hover-color)]' : '');
+      btn.style.color = 'var(--text-color)';
+      const isCurrent = i === currentIndex && isPlaying;
+      btn.innerHTML = '<span class="w-5 text-center text-[11px] opacity-40 flex-shrink-0">' + (isCurrent ? '<span class="inline-flex items-end gap-0.5 h-3"><span class="w-[2.5px] bg-[var(--link-color)] rounded-full animate-music-bar1"></span><span class="w-[2.5px] bg-[var(--link-color)] rounded-full animate-music-bar2"></span><span class="w-[2.5px] bg-[var(--link-color)] rounded-full animate-music-bar3"></span></span>' : (i + 1)) + '</span>' +
+        '<span class="w-6 h-6 rounded-md overflow-hidden flex-shrink-0">' + (song.cover_path ? '<img src="' + song.cover_path + '" class="w-full h-full object-cover"/>' : '<span class="block w-full h-full rounded-md" style="background:' + getCoverColor(song.title) + '"></span>') + '</span>' +
+        '<span class="flex-1 min-w-0 flex flex-col"><span class="text-xs truncate ' + (i === currentIndex ? 'text-[var(--link-color)] font-medium' : '') + '">' + song.title + '</span><span class="text-[10px] opacity-40 truncate">' + (song.artist || '未知艺术家') + '</span></span>' +
+        '<span class="text-[10px] opacity-40 flex-shrink-0 font-mono">' + (song.duration ? formatTime(song.duration) : '') + '</span>';
+      btn.onclick = () => playSong(i);
+      musicList.appendChild(btn);
+    });
+  }
+
+  function updateUI() {
+    const song = songs[currentIndex];
+    if (musicTitle) musicTitle.textContent = song ? song.title : '未选择歌曲';
+    if (musicArtist) musicArtist.textContent = song ? (song.artist || '未知艺术家') : '';
+    if (musicCover) {
+      if (song && song.cover_path) {
+        musicCover.innerHTML = '<img src="' + song.cover_path + '" class="w-full h-full object-cover"/>';
+      } else {
+        const color = song ? getCoverColor(song.title) : '#6b7280';
+        musicCover.innerHTML = '<div class="w-full h-full flex items-center justify-center" style="background:' + color + '"><svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-white/90"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>';
+      }
+    }
+    renderList();
+  }
+
+  function playSong(index) {
+    if (index < 0 || index >= songs.length) return;
+    currentIndex = index;
+    const song = songs[index];
+    audio.src = song.path;
+    audio.load();
+    audio.play().then(() => {
+      isPlaying = true;
+      updatePlayIcon();
+      updateUI();
+    }).catch(() => {
+      isPlaying = false;
+      updatePlayIcon();
+    });
+  }
+
+  function togglePlay() {
+    if (!audio.src) { if (songs.length > 0) playSong(0); return; }
+    if (isPlaying) {
+      audio.pause();
+      isPlaying = false;
+    } else {
+      audio.play().then(() => { isPlaying = true; }).catch(() => { isPlaying = false; });
+    }
+    updatePlayIcon();
+    updateUI();
+  }
+
+  function nextSong() {
+    if (songs.length === 0) return;
+    if (playMode === 'shuffle') {
+      let next = Math.floor(Math.random() * songs.length);
+      if (songs.length > 1) { while (next === currentIndex) next = Math.floor(Math.random() * songs.length); }
+      playSong(next);
+    } else {
+      playSong((currentIndex + 1) % songs.length);
+    }
+  }
+
+  function prevSong() {
+    if (songs.length === 0) return;
+    if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+    if (playMode === 'shuffle') {
+      let prev = Math.floor(Math.random() * songs.length);
+      if (songs.length > 1) { while (prev === currentIndex) prev = Math.floor(Math.random() * songs.length); }
+      playSong(prev);
+    } else {
+      playSong((currentIndex - 1 + songs.length) % songs.length);
+    }
+  }
+
+  function cycleMode() {
+    const modes = ['sequence', 'single', 'shuffle'];
+    playMode = modes[(modes.indexOf(playMode) + 1) % modes.length];
+    localStorage.setItem('music-play-mode', playMode);
+    updateModeIcon();
+  }
+
+  function toggleMute() {
+    if (audio.volume > 0) {
+      audio._prevVolume = audio.volume;
+      volume = 0;
+      audio.volume = 0;
+    } else {
+      volume = audio._prevVolume || 0.7;
+      audio.volume = volume;
+    }
+    if (musicVolumeFill) musicVolumeFill.style.width = (volume * 100) + '%';
+    updateVolumeIcon();
+  }
+
+  function handleProgressClick(e) {
+    if (!audio.duration) return;
+    const rect = musicProgress.getBoundingClientRect();
+    const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audio.currentTime = pct * audio.duration;
+  }
+
+  function handleVolumeClick(e) {
+    const rect = musicVolumeBar.getBoundingClientRect();
+    volume = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    audio.volume = volume;
+    localStorage.setItem('music-volume', String(volume));
+    if (musicVolumeFill) musicVolumeFill.style.width = (volume * 100) + '%';
+    updateVolumeIcon();
+  }
+
+  audio.addEventListener('timeupdate', () => {
+    if (musicProgressBar) musicProgressBar.style.width = ((audio.currentTime / (audio.duration || 1)) * 100) + '%';
+    if (musicCurrentTime) musicCurrentTime.textContent = formatTime(audio.currentTime);
+  });
+  audio.addEventListener('loadedmetadata', () => {
+    if (musicDuration) musicDuration.textContent = formatTime(audio.duration);
+  });
+  audio.addEventListener('ended', () => {
+    if (playMode === 'single') { audio.currentTime = 0; audio.play(); }
+    else { nextSong(); }
+  });
+
+  fetch('/api/music').then(r => r.ok ? r.json() : null).then(data => {
+    if (data && data.songs && data.songs.length > 0) {
+      songs = data.songs;
+      if (musicTrigger) musicTrigger.classList.remove('hidden');
+      if (musicCount) musicCount.textContent = songs.length + ' 首';
+      renderList();
+      if (audio.src && !audio.paused) {
+        isPlaying = true;
+        updatePlayIcon();
+        const idx = songs.findIndex(s => s.path === audio.src || audio.src.includes(s.path.split('/').pop()));
+        if (idx >= 0) currentIndex = idx;
+        updateUI();
+      }
+    }
+  }).catch(() => {});
+
+  if (musicTrigger) {
+    musicTrigger.onclick = (e) => {
+      e.stopPropagation();
+      container.classList.toggle('music-active');
+    };
+  }
+  if (closeMusic) {
+    closeMusic.onclick = (e) => {
+      e.stopPropagation();
+      container.classList.remove('music-active');
+    };
+  }
+  if (musicPlay) musicPlay.onclick = (e) => { e.stopPropagation(); togglePlay(); };
+  if (musicPrev) musicPrev.onclick = (e) => { e.stopPropagation(); prevSong(); };
+  if (musicNext) musicNext.onclick = (e) => { e.stopPropagation(); nextSong(); };
+  if (musicMode) musicMode.onclick = (e) => { e.stopPropagation(); cycleMode(); };
+  if (musicMute) musicMute.onclick = (e) => { e.stopPropagation(); toggleMute(); };
+  if (musicProgress) musicProgress.onmousedown = (e) => { e.stopPropagation(); handleProgressClick(e); };
+  if (musicVolumeBar) musicVolumeBar.onmousedown = (e) => { e.stopPropagation(); handleVolumeClick(e); };
 }
 
 document.addEventListener('astro:page-load', initFabMenu);
@@ -315,5 +610,32 @@ document.addEventListener('DOMContentLoaded', initFabMenu);
     background-color: var(--button-hover-color) !important;
     color: var(--link-color) !important;
     font-weight: 600;
+  }
+
+  .music-pulse {
+    animation: music-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes music-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+  }
+
+  .animate-music-bar1 {
+    animation: music-bar 0.8s ease-in-out infinite;
+    height: 5px;
+  }
+  .animate-music-bar2 {
+    animation: music-bar 0.8s ease-in-out 0.2s infinite;
+    height: 9px;
+  }
+  .animate-music-bar3 {
+    animation: music-bar 0.8s ease-in-out 0.4s infinite;
+    height: 4px;
+  }
+
+  @keyframes music-bar {
+    0%, 100% { height: 4px; }
+    50% { height: 12px; }
   }
 </style>

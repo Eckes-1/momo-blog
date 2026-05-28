@@ -3,7 +3,6 @@ import Layout from '@layouts/Layout.astro';
 import Header from '@components/Header.astro';
 import Footer from '@components/Footer.astro';
 import Search from '@components/misc/Search.astro';
-import MusicPlayer from '@components/MusicPlayer.svelte';
 
 
 interface Props {
@@ -25,8 +24,5 @@ const { title, lang, description } = Astro.props;
     </main>
     <Footer />
     <Search />
-  </div>
-  <div transition:persist="music-player">
-    <MusicPlayer client:load />
   </div>
 </Layout>
