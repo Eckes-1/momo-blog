@@ -30,15 +30,14 @@
     return `${m}:${sec < 10 ? '0' : ''}${sec}`;
   }
 
-  function getGradient(str) {
-    if (!str) return 'linear-gradient(135deg, #667eea, #764ba2)';
+  function getCoverColor(str) {
+    if (!str) return '#6b7280';
     let hash = 0;
     for (let i = 0; i < str.length; i++) {
       hash = str.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const h1 = ((hash % 360) + 360) % 360;
-    const h2 = (((hash * 7) % 360) + 360) % 360;
-    return `linear-gradient(135deg, hsl(${h1}, 65%, 55%), hsl(${h2}, 65%, 45%))`;
+    const h = ((hash % 360) + 360) % 360;
+    return `hsl(${h}, 45%, 45%)`;
   }
 
   function getCoverUrl(song) {
@@ -53,9 +52,7 @@
       if (res.ok) {
         const data = await res.json();
         songs = data.songs || [];
-        if (songs.length > 0) {
-          showPlayer = true;
-        }
+        if (songs.length > 0) showPlayer = true;
       }
     } catch (e) {
       console.error('Failed to fetch songs:', e);
@@ -275,27 +272,26 @@
 </script>
 
 {#if showPlayer && !isLoading}
-<div class="music-fab" class:expanded={showPlaylist}>
-  <button class="fab-trigger" onclick={() => showPlaylist = !showPlaylist} title="音乐播放器">
-    <div class="fab-icon-wrap" style={currentSong ? getGradient(currentSong.title) : getGradient('music')}>
-      <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" class="fab-icon" class:playing={isPlaying}>
-        <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
-      </svg>
-    </div>
-    {#if isPlaying}
-      <span class="fab-pulse"></span>
-    {/if}
+<div class="music-fab">
+  <button
+    class="music-trigger"
+    onclick={() => showPlaylist = !showPlaylist}
+    title="音乐播放器"
+  >
+    <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18" class="trigger-icon" class:playing={isPlaying}>
+      <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+    </svg>
   </button>
 
   {#if showPlaylist}
-    <div class="fab-panel">
-      <div class="panel-now-playing">
+    <div class="music-panel">
+      <div class="panel-header">
         <div class="now-cover">
           {#if currentSong && getCoverUrl(currentSong)}
             <img src={getCoverUrl(currentSong)} alt="" class="cover-img" class:spinning={isPlaying} />
           {:else}
-            <div class="cover-placeholder" style={getGradient(currentSong?.title || 'music')} class:spinning={isPlaying}>
-              <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+            <div class="cover-placeholder" style={currentSong ? 'background:' + getCoverColor(currentSong.title) : ''} class:spinning={isPlaying}>
+              <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
                 <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
               </svg>
             </div>
@@ -306,18 +302,13 @@
           <div class="now-artist">{currentSong?.artist || '未知艺术家'}</div>
         </div>
         <button class="panel-close" onclick={() => showPlaylist = false} title="关闭">
-          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
             <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
           </svg>
         </button>
       </div>
 
-      <div class="panel-progress"
-        bind:this={progressBarEl}
-        onmousedown={handleProgressMouseDown}
-        role="slider"
-        aria-label="播放进度"
-      >
+      <div class="panel-progress" bind:this={progressBarEl} onmousedown={handleProgressMouseDown}>
         <div class="progress-track">
           <div class="progress-filled" style="width: {progress}%"></div>
         </div>
@@ -351,11 +342,11 @@
         </button>
         <button class="ctrl-btn play-btn" onclick={togglePlay} title={isPlaying ? '暂停' : '播放'} disabled={songs.length === 0}>
           {#if isPlaying}
-            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
               <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
             </svg>
           {:else}
-            <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
               <path d="M8 5v14l11-7z"/>
             </svg>
           {/if}
@@ -395,11 +386,7 @@
 
       <div class="panel-list">
         {#each songs as song, i}
-          <button
-            class="list-item"
-            class:active={i === currentIndex}
-            onclick={() => playSong(i)}
-          >
+          <button class="list-item" class:active={i === currentIndex} onclick={() => playSong(i)}>
             <span class="item-index">
               {#if i === currentIndex && isPlaying}
                 <span class="playing-indicator">
@@ -413,7 +400,7 @@
               {#if getCoverUrl(song)}
                 <img src={getCoverUrl(song)} alt="" />
               {:else}
-                <span class="mini-cover" style={getGradient(song.title)}></span>
+                <span class="mini-cover" style="background:{getCoverColor(song.title)}"></span>
               {/if}
             </span>
             <span class="item-info">
@@ -432,98 +419,80 @@
 <style>
   .music-fab {
     position: fixed;
-    bottom: calc(5vh + 52px);
+    bottom: calc(5vh - 4px);
     right: 7vw;
     z-index: 999;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: center;
+    gap: 12px;
   }
 
   @media (min-width: 1024px) {
     .music-fab {
-      bottom: calc(13.5vh + 52px);
+      bottom: calc(13.5vh - 4px);
     }
   }
 
-  .fab-trigger {
-    position: relative;
+  .music-trigger {
     width: 40px;
     height: 40px;
-    border: none;
-    background: transparent;
+    border-radius: 50%;
+    border: 1px solid var(--text-color, #374151);
+    opacity: 0.2;
+    border-color: var(--text-color, #374151);
+    background: var(--bg-color, rgba(255,255,255,0.2));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     cursor: pointer;
-    padding: 0;
-    border-radius: 50%;
-    transition: transform 0.2s ease;
-  }
-
-  .fab-trigger:hover {
-    transform: scale(1.1);
-  }
-
-  .fab-icon-wrap {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.95);
-    box-shadow: 0 2px 12px rgba(99, 102, 241, 0.35);
-    transition: box-shadow 0.2s ease;
+    transition: all 0.2s ease;
+    padding: 0;
+    color: var(--text-color, #374151);
   }
 
-  .fab-trigger:hover .fab-icon-wrap {
-    box-shadow: 0 4px 20px rgba(99, 102, 241, 0.5);
+  .music-trigger:hover {
+    background: var(--button-hover-color, rgba(0,0,0,0.06));
   }
 
-  .fab-icon {
-    transition: transform 0.2s ease;
+  .music-trigger:active {
+    transform: scale(0.9);
   }
 
-  .fab-icon.playing {
+  .trigger-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .trigger-icon.playing {
     animation: pulse-icon 1.5s ease-in-out infinite;
   }
 
   @keyframes pulse-icon {
     0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.15); }
+    50% { transform: scale(1.12); }
   }
 
-  .fab-pulse {
-    position: absolute;
-    inset: -3px;
-    border-radius: 50%;
-    border: 2px solid rgba(99, 102, 241, 0.4);
-    animation: fab-pulse-ring 2s ease-out infinite;
-  }
-
-  @keyframes fab-pulse-ring {
-    0% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(1.4); opacity: 0; }
-  }
-
-  .fab-panel {
+  .music-panel {
     position: absolute;
     bottom: calc(100% + 8px);
     right: 0;
-    width: 320px;
-    max-height: 480px;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(24px) saturate(180%);
-    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    width: 300px;
+    max-height: 460px;
+    background: var(--bg-color, rgba(255,255,255,0.95));
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--text-color, #374151);
+    border-opacity: 0.2;
     border-radius: 16px;
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     animation: panel-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  }
-
-  :global([data-theme="dark"]) .fab-panel {
-    background: rgba(30, 30, 35, 0.92);
-    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    color: var(--text-color, #374151);
   }
 
   @keyframes panel-in {
@@ -531,16 +500,16 @@
     to { opacity: 1; transform: translateY(0) scale(1); }
   }
 
-  .panel-now-playing {
+  .panel-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 14px 14px 10px;
+    gap: 10px;
+    padding: 12px 12px 8px;
   }
 
   .now-cover {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     border-radius: 10px;
     overflow: hidden;
     flex-shrink: 0;
@@ -558,6 +527,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    background: #6b7280;
     color: rgba(255, 255, 255, 0.9);
   }
 
@@ -579,36 +549,30 @@
   }
 
   .now-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    color: #1f2937;
+    color: var(--text-color, #374151);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  :global([data-theme="dark"]) .now-title {
-    color: #f3f4f6;
   }
 
   .now-artist {
-    font-size: 12px;
-    color: #9ca3af;
+    font-size: 11px;
+    color: var(--text-color, #374151);
+    opacity: 0.5;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  :global([data-theme="dark"]) .now-artist {
-    color: #6b7280;
-  }
-
   .panel-close {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border: none;
     background: transparent;
-    color: #9ca3af;
+    color: var(--text-color, #374151);
+    opacity: 0.4;
     cursor: pointer;
     border-radius: 50%;
     display: flex;
@@ -619,17 +583,12 @@
   }
 
   .panel-close:hover {
-    background: rgba(0, 0, 0, 0.06);
-    color: #374151;
-  }
-
-  :global([data-theme="dark"]) .panel-close:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #e5e7eb;
+    opacity: 1;
+    background: var(--button-hover-color, rgba(0,0,0,0.06));
   }
 
   .panel-progress {
-    padding: 0 14px;
+    padding: 0 12px;
     cursor: pointer;
   }
 
@@ -637,12 +596,9 @@
     position: relative;
     width: 100%;
     height: 4px;
-    background: rgba(0, 0, 0, 0.08);
+    background: var(--text-color, #374151);
+    opacity: 0.1;
     border-radius: 2px;
-  }
-
-  :global([data-theme="dark"]) .progress-track {
-    background: rgba(255, 255, 255, 0.1);
   }
 
   .progress-filled {
@@ -650,45 +606,38 @@
     top: 0;
     left: 0;
     height: 100%;
-    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+    background: var(--link-color, #2563eb);
     border-radius: 2px;
     transition: width 0.1s linear;
-  }
-
-  :global([data-theme="dark"]) .progress-filled {
-    background: linear-gradient(90deg, #818cf8, #a78bfa);
   }
 
   .progress-time {
     display: flex;
     justify-content: space-between;
     margin-top: 4px;
-    font-size: 11px;
-    color: #9ca3af;
+    font-size: 10px;
+    color: var(--text-color, #374151);
+    opacity: 0.4;
     font-variant-numeric: tabular-nums;
-  }
-
-  :global([data-theme="dark"]) .progress-time {
-    color: #6b7280;
   }
 
   .panel-controls {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
-    padding: 8px 14px 4px;
+    gap: 2px;
+    padding: 6px 12px 2px;
   }
 
   .ctrl-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border: none;
     background: transparent;
-    color: #4b5563;
+    color: var(--text-color, #374151);
     cursor: pointer;
     border-radius: 50%;
     transition: all 0.15s ease;
@@ -696,22 +645,12 @@
     flex-shrink: 0;
   }
 
-  :global([data-theme="dark"]) .ctrl-btn {
-    color: #d1d5db;
-  }
-
   .ctrl-btn:hover {
-    background: rgba(0, 0, 0, 0.06);
-    color: #1f2937;
-  }
-
-  :global([data-theme="dark"]) .ctrl-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #f3f4f6;
+    background: var(--button-hover-color, rgba(0,0,0,0.06));
   }
 
   .ctrl-btn:disabled {
-    opacity: 0.3;
+    opacity: 0.25;
     cursor: not-allowed;
   }
 
@@ -720,63 +659,36 @@
   }
 
   .play-btn {
-    width: 42px;
-    height: 42px;
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    width: 38px;
+    height: 38px;
+    background: var(--link-color, #2563eb);
     color: white;
-    box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
   }
 
   .play-btn:hover {
-    background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    color: white;
-    transform: scale(1.08);
-    box-shadow: 0 4px 16px rgba(99, 102, 241, 0.4);
-  }
-
-  :global([data-theme="dark"]) .play-btn {
-    background: linear-gradient(135deg, #818cf8, #a78bfa);
-  }
-
-  :global([data-theme="dark"]) .play-btn:hover {
-    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    opacity: 0.85;
+    background: var(--link-color, #2563eb);
     color: white;
   }
 
   .mode-btn {
-    color: #9ca3af;
+    opacity: 0.5;
   }
 
   .mode-btn:hover {
-    color: #6366f1;
-  }
-
-  :global([data-theme="dark"]) .mode-btn {
-    color: #6b7280;
-  }
-
-  :global([data-theme="dark"]) .mode-btn:hover {
-    color: #818cf8;
+    opacity: 1;
   }
 
   .volume-toggle {
-    color: #9ca3af;
+    opacity: 0.5;
   }
 
   .volume-toggle:hover {
-    color: #6366f1;
-  }
-
-  :global([data-theme="dark"]) .volume-toggle {
-    color: #6b7280;
-  }
-
-  :global([data-theme="dark"]) .volume-toggle:hover {
-    color: #818cf8;
+    opacity: 1;
   }
 
   .panel-volume {
-    padding: 4px 14px 8px;
+    padding: 2px 12px 6px;
     cursor: pointer;
   }
 
@@ -784,12 +696,9 @@
     position: relative;
     width: 100%;
     height: 3px;
-    background: rgba(0, 0, 0, 0.08);
+    background: var(--text-color, #374151);
+    opacity: 0.1;
     border-radius: 1.5px;
-  }
-
-  :global([data-theme="dark"]) .panel-volume .volume-track {
-    background: rgba(255, 255, 255, 0.1);
   }
 
   .volume-filled {
@@ -797,50 +706,36 @@
     top: 0;
     left: 0;
     height: 100%;
-    background: #6366f1;
+    background: var(--link-color, #2563eb);
     border-radius: 1.5px;
     transition: width 0.05s linear;
-  }
-
-  :global([data-theme="dark"]) .volume-filled {
-    background: #818cf8;
   }
 
   .panel-list-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 14px;
-    border-top: 1px solid rgba(0, 0, 0, 0.06);
-  }
-
-  :global([data-theme="dark"]) .panel-list-header {
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 6px 12px;
+    border-top: 1px solid var(--text-color, #374151);
+    border-opacity: 0.08;
   }
 
   .list-title {
     font-size: 12px;
     font-weight: 600;
-    color: #374151;
-  }
-
-  :global([data-theme="dark"]) .list-title {
-    color: #e5e7eb;
+    color: var(--text-color, #374151);
   }
 
   .list-count {
-    font-size: 11px;
-    color: #9ca3af;
-  }
-
-  :global([data-theme="dark"]) .list-count {
-    color: #6b7280;
+    font-size: 10px;
+    color: var(--text-color, #374151);
+    opacity: 0.4;
   }
 
   .panel-list {
     overflow-y: auto;
     overscroll-behavior: contain;
-    max-height: 220px;
+    max-height: 200px;
     padding: 2px 0 6px;
   }
 
@@ -853,12 +748,9 @@
   }
 
   .panel-list::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.1);
+    background: var(--text-color, #374151);
+    opacity: 0.15;
     border-radius: 2px;
-  }
-
-  :global([data-theme="dark"]) .panel-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
   }
 
   .list-item {
@@ -866,48 +758,35 @@
     align-items: center;
     gap: 8px;
     width: 100%;
-    padding: 6px 14px;
+    padding: 5px 12px;
     border: none;
     background: transparent;
     cursor: pointer;
     text-align: left;
     transition: background 0.15s ease;
+    color: var(--text-color, #374151);
   }
 
   .list-item:hover {
-    background: rgba(0, 0, 0, 0.03);
-  }
-
-  :global([data-theme="dark"]) .list-item:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--button-hover-color, rgba(0,0,0,0.06));
   }
 
   .list-item.active {
-    background: rgba(99, 102, 241, 0.06);
-  }
-
-  :global([data-theme="dark"]) .list-item.active {
-    background: rgba(129, 140, 248, 0.08);
+    background: var(--button-hover-color, rgba(0,0,0,0.06));
   }
 
   .item-index {
-    width: 20px;
+    width: 18px;
     font-size: 11px;
-    color: #9ca3af;
+    color: var(--text-color, #374151);
+    opacity: 0.4;
     text-align: center;
     flex-shrink: 0;
   }
 
-  :global([data-theme="dark"]) .item-index {
-    color: #6b7280;
-  }
-
   .list-item.active .item-index {
-    color: #6366f1;
-  }
-
-  :global([data-theme="dark"]) .list-item.active .item-index {
-    color: #818cf8;
+    opacity: 1;
+    color: var(--link-color, #2563eb);
   }
 
   .playing-indicator {
@@ -919,13 +798,9 @@
 
   .playing-indicator .bar {
     width: 2.5px;
-    background: #6366f1;
+    background: var(--link-color, #2563eb);
     border-radius: 1px;
     animation: barBounce 0.8s ease-in-out infinite;
-  }
-
-  :global([data-theme="dark"]) .playing-indicator .bar {
-    background: #818cf8;
   }
 
   .playing-indicator .bar:nth-child(1) { height: 5px; animation-delay: 0s; }
@@ -938,8 +813,8 @@
   }
 
   .item-cover {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     border-radius: 6px;
     overflow: hidden;
     flex-shrink: 0;
@@ -968,47 +843,33 @@
 
   .item-title {
     font-size: 12px;
-    color: #374151;
+    color: var(--text-color, #374151);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.4;
   }
 
-  :global([data-theme="dark"]) .item-title {
-    color: #e5e7eb;
-  }
-
   .list-item.active .item-title {
-    color: #6366f1;
+    color: var(--link-color, #2563eb);
     font-weight: 500;
-  }
-
-  :global([data-theme="dark"]) .list-item.active .item-title {
-    color: #818cf8;
   }
 
   .item-artist {
     font-size: 10px;
-    color: #9ca3af;
+    color: var(--text-color, #374151);
+    opacity: 0.4;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     line-height: 1.3;
   }
 
-  :global([data-theme="dark"]) .item-artist {
-    color: #6b7280;
-  }
-
   .item-duration {
     font-size: 10px;
-    color: #9ca3af;
+    color: var(--text-color, #374151);
+    opacity: 0.4;
     flex-shrink: 0;
     font-variant-numeric: tabular-nums;
-  }
-
-  :global([data-theme="dark"]) .item-duration {
-    color: #6b7280;
   }
 </style>
