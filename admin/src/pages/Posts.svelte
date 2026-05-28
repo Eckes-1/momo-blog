@@ -83,7 +83,6 @@ onMount(() => {
 
 async function handleDelete(id) {
   try {
-    const target = postList.find(p => (p.id || p._id) === id)
     _skipNextSSE = true
     postList = postList.filter(p => (p.id || p._id) !== id)
     totalPosts = Math.max(0, totalPosts - 1)
@@ -91,6 +90,7 @@ async function handleDelete(id) {
     addToast('删除成功', 'success')
     deleteTarget = null
     await posts.delete(id)
+    loadData(true)
     loadStats()
   } catch (e) {
     addToast(e.message || '删除失败', 'error')
@@ -108,6 +108,7 @@ async function handleToggleDraft(post) {
     stats = { ...stats, published: stats.published + (newDraft ? -1 : 1), draft: stats.draft + (newDraft ? 1 : -1) }
     addToast(post.draft ? '已发布' : '已转为草稿', 'success')
     await posts.toggleDraft(pid)
+    loadData(true)
     loadStats()
   } catch (e) {
     addToast(e.message || '操作失败', 'error')
@@ -125,6 +126,7 @@ async function handleTogglePin(post) {
     stats = { ...stats, pinned: stats.pinned + (newPin ? 1 : -1) }
     addToast(post.pin_top ? '已取消置顶' : '已置顶', 'success')
     await posts.togglePin(pid)
+    loadData(true)
     loadStats()
   } catch (e) {
     addToast(e.message || '操作失败', 'error')
