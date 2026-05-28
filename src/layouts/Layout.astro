@@ -120,17 +120,25 @@ const pageLang = lang || i18n?.defaultLocale || "zh-cn";
               if (current !== _snapshot) {
                 _snapshot = current;
                 var now = Date.now();
-                if (now - _lastReload < 3000) return;
+                if (now - _lastReload < 30000) return;
                 _lastReload = now;
                 if (window.location.pathname.indexOf('/blog/') !== -1 ||
                     window.location.pathname === '/' ||
                     window.location.pathname.indexOf('/archives') !== -1 ||
                     window.location.pathname.indexOf('/friends') !== -1) {
-                  var url = window.location.pathname;
-                  if (window.location.search) {
-                    url = url.split('?')[0];
+                  if (document.startViewTransition) {
+                    document.startViewTransition(function() {
+                      return fetch(window.location.href.split('?')[0]).then(function() {
+                        window.location.reload();
+                      });
+                    });
+                  } else {
+                    var url = window.location.pathname;
+                    if (window.location.search) {
+                      url = url.split('?')[0];
+                    }
+                    window.location.href = url + '?_fresh=' + Date.now();
                   }
-                  window.location.href = url + '?_fresh=' + Date.now();
                 }
               }
             });
@@ -141,7 +149,7 @@ const pageLang = lang || i18n?.defaultLocale || "zh-cn";
             getSnapshot().then(function(snap) {
               if (snap) _snapshot = JSON.stringify(snap);
             });
-            _timer = setInterval(check, 5000);
+            _timer = setInterval(check, 30000);
           }
 
           function cleanUrl() {

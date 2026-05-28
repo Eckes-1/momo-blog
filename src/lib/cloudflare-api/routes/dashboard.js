@@ -166,8 +166,7 @@ export function registerDashboardRoutes(app) {
         p: lastPost?.t || null,
         c: lastComment?.t || null,
         cat: lastCategory?.t || null,
-        l: lastLink?.t || null,
-        _ts: Date.now()
+        l: lastLink?.t || null
       }
 
       return new Response(JSON.stringify(data), {
