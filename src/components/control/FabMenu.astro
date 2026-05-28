@@ -80,8 +80,9 @@ const tocHeadings = headings.filter(h => h.depth > 1 && h.depth < 5);
     </svg>
   </button>
 
-  <div id="musicPanel" class="absolute bottom-[calc(100%+12px)] right-0 w-[300px] max-h-[460px] bg-[var(--bg-color)]/95 backdrop-blur-lg border border-[var(--text-color)]/20 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-bottom-right scale-50 opacity-0 pointer-events-none translate-y-4 [.music-active_&]:scale-100 [.music-active_&]:opacity-100 [.music-active_&]:pointer-events-auto [.music-active_&]:translate-y-0 z-[1001]">
-    <div class="flex items-center gap-3 px-4 py-3">
+  <div id="musicPanel" class="fixed w-[300px] max-h-[460px] bg-[var(--bg-color)]/95 backdrop-blur-lg border border-[var(--text-color)]/20 rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] origin-bottom-right scale-50 opacity-0 pointer-events-none translate-y-4 z-[1001]" style="right:7vw;bottom:calc(5vh + 108px);">
+    <div class="absolute -bottom-2 right-5 w-4 h-4 bg-[var(--bg-color)]/95 border-r border-b border-[var(--text-color)]/20 rotate-45 z-0"></div>
+    <div class="relative z-10 flex flex-col h-full">
       <div id="musicCover" class="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-gray-400 flex items-center justify-center">
         <svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-white/90">
           <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
@@ -130,7 +131,8 @@ const tocHeadings = headings.filter(h => h.depth > 1 && h.depth < 5);
       <span class="text-xs font-semibold text-[var(--text-color)]">播放列表</span>
       <span id="musicCount" class="text-[10px] text-[var(--text-color)]/40">0 首</span>
     </div>
-    <div id="musicList" class="overflow-y-auto overscroll-contain max-h-[180px] p-1"></div>
+      <div id="musicList" class="overflow-y-auto overscroll-contain max-h-[180px] p-1"></div>
+    </div>
   </div>
 
   {tocHeadings.length > 0 && (
