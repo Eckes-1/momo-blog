@@ -1,4 +1,4 @@
-import Meting from '@meting/core'
+const METING_API = 'https://api.injahow.cn/meting/'
 
 export function registerMusicRoutes(app) {
   const CHUNK_SIZE = 500000
@@ -82,9 +82,9 @@ export function registerMusicRoutes(app) {
       if (song.source === 'qq' && song.external_url && song.external_url.startsWith('tencent:')) {
         const songMid = song.external_url.replace('tencent:', '')
         try {
-          const urlData = await metingUrl('tencent', songMid)
-          if (urlData && urlData.url) {
-            return c.redirect(urlData.url, 302)
+          const songData = await metingProxy('tencent', 'song', songMid)
+          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url) {
+            return c.redirect(songData[0].url, 302)
           }
         } catch {}
         return c.json({ error: '无法获取播放链接' }, 404)
@@ -93,9 +93,9 @@ export function registerMusicRoutes(app) {
       if (song.source === 'kugou' && song.external_url && song.external_url.startsWith('kugou:')) {
         const hash = song.external_url.replace('kugou:', '')
         try {
-          const urlData = await metingUrl('kugou', hash)
-          if (urlData && urlData.url) {
-            return c.redirect(urlData.url, 302)
+          const songData = await metingProxy('kugou', 'song', hash)
+          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url) {
+            return c.redirect(songData[0].url, 302)
           }
         } catch {}
         return c.json({ error: '无法获取播放链接' }, 404)
@@ -314,6 +314,20 @@ export function registerMusicRoutes(app) {
     'Cookie': 'MUSIC_U=; os=pc; appver=2.10.11; osver=Microsoft-Windows-10-Professional-build-22631'
   }
 
+  const QQ_HEADERS = {
+    'Referer': 'https://y.qq.com/',
+    'User-Agent': 'QQ%E9%9F%B3%E4%B9%90/54409 CFNetwork/901.1 Darwin/17.6.0 (x86_64)',
+    'Accept': '*/*',
+    'Accept-Language': 'zh-CN,zh;q=0.8,gl;q=0.6,zh-TW;q=0.4',
+    'Connection': 'keep-alive',
+    'Content-Type': 'application/x-www-form-urlencoded'
+  }
+
+  const KUGOU_HEADERS = {
+    'User-Agent': 'IPhone-8990-searchSong',
+    'UNI-UserAgent': 'iOS11.4-Phone8990-1009-0-WiFi'
+  }
+
   async function safeFetch(url, customHeaders) {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 10000)
@@ -329,37 +343,20 @@ export function registerMusicRoutes(app) {
     }
   }
 
-  async function metingSearchRaw(server, keyword, limit) {
-    const m = new Meting(server)
-    const result = await m.search(keyword, { page: 1, limit })
-    return JSON.parse(result)
-  }
-
-  async function metingSearch(server, keyword, limit) {
-    const m = new Meting(server)
-    m.format(true)
-    const result = await m.search(keyword, { page: 1, limit })
-    return JSON.parse(result)
-  }
-
-  async function metingPlaylist(server, id) {
-    const m = new Meting(server)
-    m.format(true)
-    const result = await m.playlist(id)
-    return JSON.parse(result)
-  }
-
-  async function metingUrl(server, id) {
-    const m = new Meting(server)
-    const result = await m.url(id, 320)
-    return JSON.parse(result)
-  }
-
-  async function metingSong(server, id) {
-    const m = new Meting(server)
-    m.format(true)
-    const result = await m.song(id)
-    return JSON.parse(result)
+  async function metingProxy(server, type, id) {
+    const url = `${METING_API}?server=${server}&type=${type}&id=${encodeURIComponent(id)}`
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 10000)
+    try {
+      const resp = await fetch(url, { signal: controller.signal })
+      if (!resp.ok) return null
+      const text = await resp.text()
+      try { return JSON.parse(text) } catch { return null }
+    } catch {
+      return null
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   app.get('/api/music/netease/search', async (c) => {
@@ -545,27 +542,24 @@ export function registerMusicRoutes(app) {
     if (!keyword) return c.json({ error: '请输入搜索关键词' }, 400)
 
     try {
-      const rawData = await metingSearchRaw('tencent', keyword, 999999)
-      const formatted = await metingSearch('tencent', keyword, 999999)
+      const data = await safeFetch(
+        `https://c.y.qq.com/soso/fcgi-bin/client_search_cp?format=json&p=1&n=999999&w=${encodeURIComponent(keyword)}&aggr=1&lossless=1&cr=1&new_json=1`,
+        QQ_HEADERS
+      )
 
-      if (!formatted || formatted.length === 0) {
+      if (!data || data.code !== 0 || !data.data || !data.data.song || !data.data.song.list) {
         return c.json({ songs: [], message: '未找到相关歌曲' })
       }
 
-      const rawList = (rawData && rawData.data && rawData.data.song && rawData.data.song.list) || []
-
-      const songs = formatted.map((s, i) => {
-        const raw = rawList[i] || {}
-        return {
-          id: s.id,
-          title: s.name || '',
-          artist: (s.artist || []).join(' / '),
-          album: s.album || '',
-          duration: raw.interval || 0,
-          cover: s.pic_id ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${s.pic_id}.jpg` : '',
-          external_url: `tencent:${s.id}`
-        }
-      })
+      const songs = data.data.song.list.map(s => ({
+        id: s.mid || s.songmid,
+        title: s.title || s.name || '',
+        artist: (s.singer || []).map(a => a.name || a.title).join(' / '),
+        album: (s.album || {}).title || s.albumname || '',
+        duration: s.interval || 0,
+        cover: (s.album || {}).mid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${s.album.mid}.jpg` : '',
+        external_url: `tencent:${s.mid || s.songmid}`
+      }))
 
       return c.json({ songs })
     } catch (err) {
@@ -579,27 +573,35 @@ export function registerMusicRoutes(app) {
 
     const playlistId = c.req.param('id')
     try {
-      const results = await metingPlaylist('tencent', playlistId)
+      const data = await safeFetch(
+        `https://c.y.qq.com/v8/fcg-bin/fcg_v8_playlist_cp.fcg?id=${playlistId}&format=json&newsong=1&platform=jqspaframe.json`,
+        QQ_HEADERS
+      )
 
-      if (!results || results.length === 0) {
+      if (!data || data.code !== 0 || !data.data) {
         return c.json({ error: '无法获取歌单，请检查 ID 或稍后再试' }, 404)
       }
 
-      const songs = results.map(s => ({
-        id: s.id,
-        title: s.name || '',
-        artist: (s.artist || []).join(' / '),
-        album: s.album || '',
-        duration: 0,
-        cover: s.pic_id ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${s.pic_id}.jpg` : '',
-        external_url: `tencent:${s.id}`
-      }))
+      const pd = data.data
+      const songList = pd.songlist || pd.cdlist && pd.cdlist[0] && pd.cdlist[0].songlist || []
+      const songs = songList.map(s => {
+        const songData = s.musicData || s
+        return {
+          id: songData.mid || songData.songmid,
+          title: songData.title || songData.name || songData.songname || '',
+          artist: (songData.singer || []).map(a => a.name || a.title).join(' / '),
+          album: (songData.album || {}).title || songData.albumname || '',
+          duration: songData.interval || 0,
+          cover: (songData.album || {}).mid ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${songData.album.mid}.jpg` : '',
+          external_url: `tencent:${songData.mid || songData.songmid}`
+        }
+      })
 
       return c.json({
-        name: 'QQ音乐歌单',
-        description: '',
-        cover: '',
-        trackCount: songs.length,
+        name: pd.diss_name || pd.dissname || (pd.cdlist && pd.cdlist[0] && pd.cdlist[0].diss_name) || '',
+        description: pd.desc || '',
+        cover: pd.diss_cover || pd.logo || '',
+        trackCount: pd.total_song_num || songs.length,
         songs
       })
     } catch (err) {
@@ -615,27 +617,24 @@ export function registerMusicRoutes(app) {
     if (!keyword) return c.json({ error: '请输入搜索关键词' }, 400)
 
     try {
-      const rawData = await metingSearchRaw('kugou', keyword, 999999)
-      const formatted = await metingSearch('kugou', keyword, 999999)
+      const data = await safeFetch(
+        `https://mobileservice.kugou.com/api/v3/search/song?keyword=${encodeURIComponent(keyword)}&pagesize=999999&page=1&api_ver=1&area_code=1&correct=1&plat=2&tag=1&sver=5&showtype=10&version=8990`,
+        KUGOU_HEADERS
+      )
 
-      if (!formatted || formatted.length === 0) {
+      if (!data || data.status !== 1 || !data.data || !data.data.info) {
         return c.json({ songs: [], message: '未找到相关歌曲' })
       }
 
-      const rawInfo = (rawData && rawData.data && rawData.data.info) || []
-
-      const songs = formatted.map((s, i) => {
-        const raw = rawInfo[i] || {}
-        return {
-          id: s.id,
-          title: s.name || '',
-          artist: (s.artist || []).join(' / '),
-          album: s.album || '',
-          duration: raw.duration ? Math.round(raw.duration) : 0,
-          cover: raw.img ? raw.img.replace('{size}', '300') : '',
-          external_url: `kugou:${s.url_id || s.id}`
-        }
-      })
+      const songs = data.data.info.map(s => ({
+        id: s.hash || s.album_audio_id || String(s.songid),
+        title: (s.songname || s.filename || '').replace(/<[^>]*>/g, ''),
+        artist: (s.author_name || (s.authors && s.authors.map(a => a.author_name).join(' / ')) || '').replace(/<[^>]*>/g, ''),
+        album: (s.album_name || '').replace(/<[^>]*>/g, ''),
+        duration: s.duration ? Math.round(s.duration) : 0,
+        cover: s.img ? s.img.replace('{size}', '300') : (s.album_img ? s.album_img.replace('{size}', '300') : ''),
+        external_url: `kugou:${s.hash}`
+      }))
 
       return c.json({ songs })
     } catch (err) {
@@ -649,22 +648,21 @@ export function registerMusicRoutes(app) {
 
     const hash = c.req.param('hash')
     try {
-      const urlData = await metingUrl('kugou', hash)
+      const songData = await metingProxy('kugou', 'song', hash)
 
-      if (!urlData || !urlData.url) {
-        return c.json({ error: '无法获取播放链接，该歌曲可能需要 VIP' }, 404)
+      if (!songData || (Array.isArray(songData) && songData.length === 0) || songData.error) {
+        return c.json({ error: '无法获取歌曲详情' }, 404)
       }
 
-      const songData = await metingSong('kugou', hash)
-
+      const s = Array.isArray(songData) ? songData[0] : songData
       return c.json({
         id: hash,
-        title: songData && songData.name ? songData.name : '',
-        artist: songData && songData.artist ? songData.artist.join(' / ') : '',
-        album: songData && songData.album ? songData.album : '',
+        title: s.name || s.songName || '',
+        artist: s.artist || s.author_name || '',
+        album: s.album || s.album_name || '',
         duration: 0,
-        cover: '',
-        external_url: urlData.url
+        cover: s.pic || s.img || '',
+        external_url: s.url || `${METING_API}?server=kugou&type=url&id=${hash}`
       })
     } catch (err) {
       return c.json({ error: '获取歌曲详情失败' }, 500)
