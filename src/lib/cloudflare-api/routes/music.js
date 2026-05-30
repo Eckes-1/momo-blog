@@ -71,6 +71,35 @@ export function registerMusicRoutes(app) {
     }
   })
 
+  app.get('/api/music/cover/:id', async (c) => {
+    try {
+      const id = c.req.param('id')
+      const song = await c.env.DB.prepare(
+        'SELECT cover_path, source FROM music WHERE id = ?'
+      ).bind(id).first()
+      if (!song || !song.cover_path) {
+        return new Response(null, { status: 404 })
+      }
+      const coverUrl = song.cover_path
+      const resp = await fetch(coverUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+        signal: AbortSignal.timeout(10000)
+      })
+      if (!resp.ok) return new Response(null, { status: resp.status })
+      const contentType = resp.headers.get('content-type') || 'image/jpeg'
+      const body = await resp.arrayBuffer()
+      return new Response(body, {
+        headers: {
+          'Content-Type': contentType,
+          'Cache-Control': 'public, max-age=86400',
+          'Access-Control-Allow-Origin': '*'
+        }
+      })
+    } catch {
+      return new Response(null, { status: 500 })
+    }
+  })
+
   app.get('/api/music/stream/:id', async (c) => {
     try {
       const id = c.req.param('id')

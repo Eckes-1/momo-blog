@@ -426,8 +426,9 @@ function initMusicPlayer(container) {
       btn.className = 'flex items-center gap-2 w-full px-3 py-1.5 border-none bg-transparent cursor-pointer text-left transition-colors hover:bg-[var(--button-hover-color)] ' + (i === currentIndex ? 'bg-[var(--button-hover-color)]' : '');
       btn.style.color = 'var(--text-color)';
       const isCurrent = i === currentIndex && isPlaying;
+      const coverSrc = song.id ? '/api/music/cover/' + song.id : (song.cover_path || '');
       btn.innerHTML = '<span class="w-5 text-center text-[11px] opacity-40 flex-shrink-0">' + (isCurrent ? '<span class="inline-flex items-end gap-0.5 h-3"><span class="w-[2.5px] bg-[var(--link-color)] rounded-full animate-music-bar1"></span><span class="w-[2.5px] bg-[var(--link-color)] rounded-full animate-music-bar2"></span><span class="w-[2.5px] bg-[var(--link-color)] rounded-full animate-music-bar3"></span></span>' : (i + 1)) + '</span>' +
-        '<span class="w-6 h-6 rounded-md overflow-hidden flex-shrink-0">' + (song.cover_path ? '<img src="' + song.cover_path + '" class="w-full h-full object-cover"/>' : '<span class="block w-full h-full rounded-md" style="background:' + getCoverColor(song.title) + '"></span>') + '</span>' +
+        '<span class="w-6 h-6 rounded-md overflow-hidden flex-shrink-0">' + (coverSrc ? '<img src="' + coverSrc + '" class="w-full h-full object-cover"/>' : '<span class="block w-full h-full rounded-md" style="background:' + getCoverColor(song.title) + '"></span>') + '</span>' +
         '<span class="flex-1 min-w-0 flex flex-col"><span class="text-xs truncate ' + (i === currentIndex ? 'text-[var(--link-color)] font-medium' : '') + '">' + song.title + '</span><span class="text-[10px] opacity-40 truncate">' + (song.artist || '未知艺术家') + '</span></span>' +
         '<span class="text-[10px] opacity-40 flex-shrink-0 font-mono">' + (song.duration ? formatTime(song.duration) : '') + '</span>';
       btn.onclick = () => playSong(i);
@@ -440,8 +441,9 @@ function initMusicPlayer(container) {
     if (musicTitle) musicTitle.textContent = song ? song.title : '未选择歌曲';
     if (musicArtist) musicArtist.textContent = song ? (song.artist || '未知艺术家') : '';
     if (musicCover) {
-      if (song && song.cover_path) {
-        musicCover.innerHTML = '<img src="' + song.cover_path + '" class="w-full h-full object-cover"/>';
+      const coverSrc = song && song.id ? '/api/music/cover/' + song.id : (song && song.cover_path || '');
+      if (coverSrc) {
+        musicCover.innerHTML = '<img src="' + coverSrc + '" class="w-full h-full object-cover"/>';
       } else {
         const color = song ? getCoverColor(song.title) : '#6b7280';
         musicCover.innerHTML = '<div class="w-full h-full flex items-center justify-center" style="background:' + color + '"><svg viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-white/90"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg></div>';

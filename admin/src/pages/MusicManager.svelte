@@ -512,7 +512,7 @@
                   <td class="px-5 py-3 text-sm text-gray-400 dark:text-gray-500 text-center">{(musicPage - 1) * musicPageSize + i + 1}</td>
                   <td class="px-3 py-3">
                     {#if song.cover_path}
-                      <img src={song.cover_path} alt="" class="w-9 h-9 rounded-lg object-cover" />
+                      <img src="/api/music/cover/{song.id}" alt="" class="w-9 h-9 rounded-lg object-cover" />
                     {:else}
                       <div class="w-9 h-9 rounded-lg bg-gray-200/50 dark:bg-gray-700/50 flex items-center justify-center">
                         <svg viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 text-gray-400 dark:text-gray-500"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
