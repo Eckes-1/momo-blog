@@ -131,9 +131,15 @@ export function registerMusicRoutes(app) {
           }
         } catch {}
         try {
-          const songData = await metingProxy('kuwo', 'song', rid)
-          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url) {
-            return c.redirect(songData[0].url, 302)
+          const urlResp2 = await fetch(
+            `https://antiserver.kuwo.cn/anti.s?type=convert_url3&rid=MUSIC_${rid}&format=mp3&response=url`,
+            { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }, signal: AbortSignal.timeout(10000) }
+          )
+          if (urlResp2.ok) {
+            const text = await urlResp2.text()
+            if (text.startsWith('http')) {
+              return c.redirect(text.trim(), 302)
+            }
           }
         } catch {}
         return c.json({ error: '无法获取播放链接' }, 404)
@@ -899,18 +905,24 @@ export function registerMusicRoutes(app) {
           const match = item.url.match(/^kuwo:(\d+)$/)
           if (!match) continue
           try {
-            const infoData = await safeFetch(
-              `https://m.kuwo.cn/newh5/singles/songinfo?mid=${match[1]}`,
-              { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'https://m.kuwo.cn/' }
+            const searchResp = await fetch(
+              `https://search.kuwo.cn/r.s?all=MUSIC_${match[1]}&ft=music&itemset=web_2013&client=kt&pn=0&rn=1&rformat=json&encoding=utf8&vipver=MUSIC_8.10.2.0&devid=00000000-0000-0000-0000-000000000000&newver=3&pcjson=1`,
+              { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': 'https://www.kuwo.cn/search/list' }, signal: AbortSignal.timeout(10000) }
             )
-            if (infoData && infoData.data && infoData.data.pic) {
-              await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(infoData.data.pic, item.id).run()
-              const song = results.find(r => r.id === item.id)
-              if (song) song.cover_path = infoData.data.pic
-            } else if (infoData && infoData.data && infoData.data.albumPic) {
-              await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(infoData.data.albumPic, item.id).run()
-              const song = results.find(r => r.id === item.id)
-              if (song) song.cover_path = infoData.data.albumPic
+            if (searchResp.ok) {
+              const searchText = await searchResp.text()
+              try {
+                const searchData = JSON.parse(searchText)
+                if (searchData && searchData.abslist && searchData.abslist.length > 0) {
+                  const s = searchData.abslist[0]
+                  const coverUrl = s.hts_MVPIC || (s.MVPIC ? `https://img1.kuwo.cn/wmvpic/${s.MVPIC}` : '')
+                  if (coverUrl) {
+                    await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(coverUrl, item.id).run()
+                    const song = results.find(r => r.id === item.id)
+                    if (song) song.cover_path = coverUrl
+                  }
+                }
+              } catch {}
             }
           } catch {}
         }
@@ -1078,19 +1090,6 @@ export function registerMusicRoutes(app) {
     }
   })
 
-  function parseKuwoJson(text) {
-    try { return JSON.parse(text) } catch {}
-    try {
-      let fixed = text
-        .replace(/'/g, '"')
-        .replace(/\\u0026/g, '&')
-        .replace(/\\\\/g, '\\')
-      fixed = fixed.replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')
-      try { return JSON.parse(fixed) } catch {}
-    } catch {}
-    return null
-  }
-
   app.get('/api/music/kuwo/search', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: '未认证' }, 401)
@@ -1099,7 +1098,7 @@ export function registerMusicRoutes(app) {
     if (!keyword) return c.json({ error: '请输入搜索关键词' }, 400)
 
     try {
-      const searchUrl = `https://search.kuwo.cn/r.s?all=${encodeURIComponent(keyword)}&ft=music&itemset=web_2013&client=kt&pn=0&rn=100&rformat=json&encoding=utf8`
+      const searchUrl = `https://search.kuwo.cn/r.s?all=${encodeURIComponent(keyword)}&ft=music&itemset=web_2013&client=kt&pn=0&rn=100&rformat=json&encoding=utf8&vipver=MUSIC_8.10.2.0&devid=00000000-0000-0000-0000-000000000000&newver=3&pcjson=1`
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 10000)
       let data = null
@@ -1113,7 +1112,7 @@ export function registerMusicRoutes(app) {
         })
         if (resp.ok) {
           const text = await resp.text()
-          data = parseKuwoJson(text)
+          try { data = JSON.parse(text) } catch {}
         }
       } catch {} finally { clearTimeout(timer) }
 
@@ -1123,13 +1122,14 @@ export function registerMusicRoutes(app) {
 
       const songs = data.abslist.map(s => {
         const rid = String(s.MUSICRID || '').replace('MUSIC_', '')
+        const cover = s.hts_MVPIC || (s.MVPIC ? `https://img1.kuwo.cn/wmvpic/${s.MVPIC}` : '')
         return {
           id: rid,
           title: (s.SONGNAME || s.NAME || '').replace(/&nbsp;/g, ' ').trim(),
           artist: (s.ARTIST || '').replace(/&nbsp;/g, ' ').trim(),
           album: (s.ALBUM || '').replace(/&nbsp;/g, ' ').trim(),
           duration: s.DURATION ? Math.round(Number(s.DURATION)) : 0,
-          cover: s.MVPIC ? `https://img4.kuwo.cn/star/albumcover/300/35/30/${s.MVPIC}` : (s.web_albumpic_short ? `https://img4.kuwo.cn/star/albumcover/${s.web_albumpic_short}` : ''),
+          cover,
           external_url: `kuwo:${rid}`
         }
       })
@@ -1165,32 +1165,34 @@ export function registerMusicRoutes(app) {
         }
       } catch {}
 
-      if (!playUrl) {
-        const metingData = await metingProxy('kuwo', 'song', rid)
-        if (metingData && Array.isArray(metingData) && metingData.length > 0 && metingData[0].url) {
-          playUrl = metingData[0].url
-        }
-      }
-
-      let songInfo = {}
+      let songInfo = { songName: '', artist: '', album: '', pic: '' }
       try {
-        const infoResp = await fetch(`https://m.kuwo.cn/newh5/singles/songinfo?mid=${rid}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'https://m.kuwo.cn/' },
-          signal: AbortSignal.timeout(10000)
-        })
-        if (infoResp.ok) {
-          const infoData = await infoResp.json()
-          if (infoData && infoData.data) songInfo = infoData.data
+        const searchResp = await fetch(
+          `https://search.kuwo.cn/r.s?all=MUSIC_${rid}&ft=music&itemset=web_2013&client=kt&pn=0&rn=1&rformat=json&encoding=utf8&vipver=MUSIC_8.10.2.0&devid=00000000-0000-0000-0000-000000000000&newver=3&pcjson=1`,
+          { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': 'https://www.kuwo.cn/search/list' }, signal: AbortSignal.timeout(10000) }
+        )
+        if (searchResp.ok) {
+          const searchText = await searchResp.text()
+          try {
+            const searchData = JSON.parse(searchText)
+            if (searchData && searchData.abslist && searchData.abslist.length > 0) {
+              const s = searchData.abslist[0]
+              songInfo.songName = (s.SONGNAME || s.NAME || '').replace(/&nbsp;/g, ' ').trim()
+              songInfo.artist = (s.ARTIST || '').replace(/&nbsp;/g, ' ').trim()
+              songInfo.album = (s.ALBUM || '').replace(/&nbsp;/g, ' ').trim()
+              songInfo.pic = s.hts_MVPIC || (s.MVPIC ? `https://img1.kuwo.cn/wmvpic/${s.MVPIC}` : '')
+            }
+          } catch {}
         }
       } catch {}
 
       return c.json({
         id: rid,
-        title: songInfo.songName || songInfo.name || '',
-        artist: songInfo.artist || '',
-        album: songInfo.album || '',
-        duration: songInfo.duration ? Math.round(songInfo.duration / 1000) : 0,
-        cover: songInfo.pic || songInfo.albumPic || '',
+        title: songInfo.songName,
+        artist: songInfo.artist,
+        album: songInfo.album,
+        duration: 0,
+        cover: songInfo.pic,
         external_url: playUrl || `kuwo:${rid}`
       })
     } catch (err) {
@@ -1333,16 +1335,23 @@ export function registerMusicRoutes(app) {
         const match = (song.external_url || '').match(/^kuwo:(\d+)$/)
         if (!match) continue
         try {
-          const infoData = await safeFetch(
-            `https://m.kuwo.cn/newh5/singles/songinfo?mid=${match[1]}`,
-            { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'https://m.kuwo.cn/' }
+          const searchResp = await fetch(
+            `https://search.kuwo.cn/r.s?all=MUSIC_${match[1]}&ft=music&itemset=web_2013&client=kt&pn=0&rn=1&rformat=json&encoding=utf8&vipver=MUSIC_8.10.2.0&devid=00000000-0000-0000-0000-000000000000&newver=3&pcjson=1`,
+            { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': 'https://www.kuwo.cn/search/list' }, signal: AbortSignal.timeout(10000) }
           )
-          if (infoData && infoData.data) {
-            const coverUrl = infoData.data.pic || infoData.data.albumPic || ''
-            if (coverUrl) {
-              await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(coverUrl, song.id).run()
-              updated++
-            }
+          if (searchResp.ok) {
+            const searchText = await searchResp.text()
+            try {
+              const searchData = JSON.parse(searchText)
+              if (searchData && searchData.abslist && searchData.abslist.length > 0) {
+                const s = searchData.abslist[0]
+                const coverUrl = s.hts_MVPIC || (s.MVPIC ? `https://img1.kuwo.cn/wmvpic/${s.MVPIC}` : '')
+                if (coverUrl) {
+                  await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(coverUrl, song.id).run()
+                  updated++
+                }
+              }
+            } catch {}
           }
         } catch {}
       }
