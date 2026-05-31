@@ -113,7 +113,7 @@ export function registerMusicRoutes(app) {
         const rid = song.external_url.replace('kuwo:', '')
         try {
           const urlResp = await fetch(
-            `http://antiserver.kuwo.cn/anti.s?type=convert_url&rid=MUSIC_${rid}&format=mp3&response=url`,
+            `https://antiserver.kuwo.cn/anti.s?type=convert_url&rid=MUSIC_${rid}&format=mp3&response=url`,
             { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }, signal: AbortSignal.timeout(10000) }
           )
           if (urlResp.ok) {
@@ -900,8 +900,8 @@ export function registerMusicRoutes(app) {
           if (!match) continue
           try {
             const infoData = await safeFetch(
-              `http://m.kuwo.cn/newh5/singles/songinfo?mid=${match[1]}`,
-              { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'http://m.kuwo.cn/' }
+              `https://m.kuwo.cn/newh5/singles/songinfo?mid=${match[1]}`,
+              { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'https://m.kuwo.cn/' }
             )
             if (infoData && infoData.data && infoData.data.pic) {
               await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(infoData.data.pic, item.id).run()
@@ -1078,6 +1078,19 @@ export function registerMusicRoutes(app) {
     }
   })
 
+  function parseKuwoJson(text) {
+    try { return JSON.parse(text) } catch {}
+    try {
+      let fixed = text
+        .replace(/'/g, '"')
+        .replace(/\\u0026/g, '&')
+        .replace(/\\\\/g, '\\')
+      fixed = fixed.replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')
+      try { return JSON.parse(fixed) } catch {}
+    } catch {}
+    return null
+  }
+
   app.get('/api/music/kuwo/search', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: '未认证' }, 401)
@@ -1086,7 +1099,7 @@ export function registerMusicRoutes(app) {
     if (!keyword) return c.json({ error: '请输入搜索关键词' }, 400)
 
     try {
-      const searchUrl = `http://search.kuwo.cn/r.s?all=${encodeURIComponent(keyword)}&ft=music&itemset=web_2013&client=kt&pn=0&rn=100&rformat=json&encoding=utf8`
+      const searchUrl = `https://search.kuwo.cn/r.s?all=${encodeURIComponent(keyword)}&ft=music&itemset=web_2013&client=kt&pn=0&rn=100&rformat=json&encoding=utf8`
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 10000)
       let data = null
@@ -1094,22 +1107,13 @@ export function registerMusicRoutes(app) {
         const resp = await fetch(searchUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Referer': 'http://www.kuwo.cn/search/list'
+            'Referer': 'https://www.kuwo.cn/search/list'
           },
           signal: controller.signal
         })
         if (resp.ok) {
           const text = await resp.text()
-          try {
-            data = JSON.parse(text)
-          } catch {
-            try {
-              const fixed = text.replace(/'/g, '"').replace(/(\w+):/g, '"$1":')
-              data = JSON.parse(fixed)
-            } catch {
-              try { data = (new Function('return ' + text))() } catch {}
-            }
-          }
+          data = parseKuwoJson(text)
         }
       } catch {} finally { clearTimeout(timer) }
 
@@ -1118,7 +1122,7 @@ export function registerMusicRoutes(app) {
       }
 
       const songs = data.abslist.map(s => {
-        const rid = (s.MUSICRID || '').replace('MUSIC_', '')
+        const rid = String(s.MUSICRID || '').replace('MUSIC_', '')
         return {
           id: rid,
           title: (s.SONGNAME || s.NAME || '').replace(/&nbsp;/g, ' ').trim(),
@@ -1145,7 +1149,7 @@ export function registerMusicRoutes(app) {
       let playUrl = ''
       try {
         const urlResp = await fetch(
-          `http://antiserver.kuwo.cn/anti.s?type=convert_url&rid=MUSIC_${rid}&format=mp3&response=url`,
+          `https://antiserver.kuwo.cn/anti.s?type=convert_url&rid=MUSIC_${rid}&format=mp3&response=url`,
           { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }, signal: AbortSignal.timeout(10000) }
         )
         if (urlResp.ok) {
@@ -1170,8 +1174,8 @@ export function registerMusicRoutes(app) {
 
       let songInfo = {}
       try {
-        const infoResp = await fetch(`http://m.kuwo.cn/newh5/singles/songinfo?mid=${rid}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'http://m.kuwo.cn/' },
+        const infoResp = await fetch(`https://m.kuwo.cn/newh5/singles/songinfo?mid=${rid}`, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'https://m.kuwo.cn/' },
           signal: AbortSignal.timeout(10000)
         })
         if (infoResp.ok) {
@@ -1330,8 +1334,8 @@ export function registerMusicRoutes(app) {
         if (!match) continue
         try {
           const infoData = await safeFetch(
-            `http://m.kuwo.cn/newh5/singles/songinfo?mid=${match[1]}`,
-            { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'http://m.kuwo.cn/' }
+            `https://m.kuwo.cn/newh5/singles/songinfo?mid=${match[1]}`,
+            { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'https://m.kuwo.cn/' }
           )
           if (infoData && infoData.data) {
             const coverUrl = infoData.data.pic || infoData.data.albumPic || ''
