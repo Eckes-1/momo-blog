@@ -458,10 +458,12 @@ function initMusicPlayer(container) {
     if (index < 0 || index >= songs.length) return;
     currentIndex = index;
     const song = songs[index];
-    if (song.source === 'qq' || song.source === 'kugou' || song.source === 'netease' || song.source === 'kuwo') {
+    const extUrl = song.external_url || ''
+    const hasPlatformPrefix = extUrl.startsWith('kuwo:') || extUrl.startsWith('tencent:') || extUrl.startsWith('kugou:') || extUrl.startsWith('migu:') || /id=\d+/.test(extUrl)
+    if (hasPlatformPrefix || song.source === 'qq' || song.source === 'kugou' || song.source === 'netease' || song.source === 'kuwo' || song.source === 'migu' || song.source === 'aggregate') {
       audio.src = '/api/music/stream/' + song.id;
-    } else if ((song.source === 'external') && song.external_url) {
-      audio.src = song.external_url;
+    } else if (song.source === 'external' && extUrl && !hasPlatformPrefix) {
+      audio.src = extUrl;
     } else if (song.source === 'external') {
       audio.src = '/api/music/stream/' + song.id;
     } else {

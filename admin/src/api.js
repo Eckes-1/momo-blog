@@ -475,6 +475,8 @@ export const music = {
   kugouSong(hash) { return request(`/music/kugou/song/${hash}`) },
   kuwoSearch(keyword) { return request(`/music/kuwo/search?keyword=${encodeURIComponent(keyword)}`) },
   kuwoSong(rid) { return request(`/music/kuwo/song/${rid}`) },
+  miguSearch(keyword) { return request(`/music/migu/search?keyword=${encodeURIComponent(keyword)}`) },
+  aggregateSearch(keyword) { return request(`/music/aggregate/search?keyword=${encodeURIComponent(keyword)}`, {}, 30000) },
   updateCovers() { return request('/music/update-covers', { method: 'POST' }) },
   importSongs(songs, source = 'external') { return request('/music/netease/import', { method: 'POST', body: JSON.stringify({ songs, source }) }) }
 }

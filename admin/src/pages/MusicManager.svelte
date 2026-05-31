@@ -96,6 +96,7 @@
     qq: songs.filter(s => s.source === 'qq').length,
     kugou: songs.filter(s => s.source === 'kugou').length,
     kuwo: songs.filter(s => s.source === 'kuwo').length,
+    migu: songs.filter(s => s.source === 'migu').length,
     external: songs.filter(s => s.source === 'external').length,
     upload: songs.filter(s => s.source === 'upload' || !s.source).length,
     totalDuration: songs.reduce((sum, s) => sum + (s.duration || 0), 0),
@@ -381,6 +382,21 @@
         data = await music.kugouSearch(platformKeyword.trim())
       } else if (platform === 'kuwo') {
         data = await music.kuwoSearch(platformKeyword.trim())
+      } else if (platform === 'aggregate') {
+        data = await music.aggregateSearch(platformKeyword.trim())
+        if (data.platforms) {
+          let allSongs = []
+          for (const [source, info] of Object.entries(data.platforms)) {
+            for (const s of info.songs) {
+              allSongs.push({ ...s, _platform: source, _platformLabel: info.label })
+            }
+          }
+          platformResults = allSongs
+          platformMessage = allSongs.length === 0 ? '未找到相关歌曲' : ''
+          platformSearched = true
+          platformSearching = false
+          return
+        }
       }
       platformResults = data.songs || []
       platformMessage = data.message || ''
@@ -401,7 +417,7 @@
 
     platformImporting = true
     try {
-      const result = await music.neteaseImport(selected.map(s => ({ ...s, _source: platform })))
+      const result = await music.neteaseImport(selected.map(s => ({ ...s, _source: s._platform || platform })))
       addToast(`成功导入 ${result.ok}/${result.total} 首歌曲`, 'success')
       platformSelected = new Set()
       loadData()
@@ -765,6 +781,8 @@
                       <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium">酷狗</span>
                     {:else if song.source === 'kuwo'}
                       <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 font-medium">酷我</span>
+                    {:else if song.source === 'migu'}
+                      <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 font-medium">咪咕</span>
                     {:else if song.source === 'external'}
                       <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 font-medium">网络</span>
                     {:else}
@@ -829,6 +847,7 @@
         <button onclick={() => { platform = 'qq'; platformResults = []; platformSearched = false; platformMessage = '' }} class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {platform === 'qq' ? 'bg-green-500/70 text-white' : 'bg-white/40 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-700/60'}">QQ音乐</button>
         <button onclick={() => { platform = 'kugou'; platformResults = []; platformSearched = false; platformMessage = '' }} class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {platform === 'kugou' ? 'bg-blue-500/70 text-white' : 'bg-white/40 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-700/60'}">酷狗音乐</button>
         <button onclick={() => { platform = 'kuwo'; platformResults = []; platformSearched = false; platformMessage = '' }} class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {platform === 'kuwo' ? 'bg-orange-500/70 text-white' : 'bg-white/40 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-700/60'}">酷我音乐</button>
+        <button onclick={() => { platform = 'aggregate'; platformResults = []; platformSearched = false; platformMessage = '' }} class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {platform === 'aggregate' ? 'bg-purple-500/70 text-white' : 'bg-white/40 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-700/60'}">聚合搜索</button>
       </div>
 
       <div class="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">
@@ -889,6 +908,9 @@
                   <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{song.title}</div>
                   <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{song.artist}{song.album ? ' · ' + song.album : ''}</div>
                 </div>
+                {#if song._platformLabel}
+                  <span class="text-xs px-1.5 py-0.5 rounded-full bg-gray-200/50 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 flex-shrink-0">{song._platformLabel}</span>
+                {/if}
                 <span class="text-xs text-gray-400 dark:text-gray-500 tabular-nums flex-shrink-0">{formatTime(song.duration)}</span>
               </label>
             {/each}

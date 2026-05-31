@@ -1,8 +1,28 @@
 const METING_API = 'https://api.injahow.cn/meting/'
 const NETEASE_API = 'https://neteasecloudmusicapi.ivelly.com'
+const LXMUSIC_API = 'https://lxmusicapi.onrender.com'
+const LXMUSIC_KEY = 'share-v3'
 
 export function registerMusicRoutes(app) {
   const CHUNK_SIZE = 500000
+
+  async function lxmusicGetUrl(source, songId, quality = '320k') {
+    try {
+      const resp = await fetch(`${LXMUSIC_API}/url/${source}/${songId}/${quality}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'lx-music-request/1.0',
+          'X-Request-Key': LXMUSIC_KEY,
+        },
+        signal: AbortSignal.timeout(10000),
+      })
+      if (resp.ok) {
+        const data = await resp.json()
+        if (data.code === 0 && data.url) return data.url
+      }
+    } catch {}
+    return null
+  }
 
   function arrayBufferToBase64(buffer) {
     const uint8 = new Uint8Array(buffer)
@@ -109,8 +129,10 @@ export function registerMusicRoutes(app) {
 
       if (!song) return c.json({ error: '歌曲不存在' }, 404)
 
-      if (song.source === 'kuwo' && song.external_url && song.external_url.startsWith('kuwo:')) {
-        const rid = song.external_url.replace('kuwo:', '')
+      const extUrl = song.external_url || ''
+
+      if (extUrl.startsWith('kuwo:')) {
+        const rid = extUrl.replace('kuwo:', '')
         try {
           const urlResp = await fetch(
             `https://antiserver.kuwo.cn/anti.s?type=convert_url&rid=MUSIC_${rid}&format=mp3&response=url`,
@@ -142,54 +164,68 @@ export function registerMusicRoutes(app) {
             }
           }
         } catch {}
+        const lxUrl = await lxmusicGetUrl('kw', rid)
+        if (lxUrl) return c.redirect(lxUrl, 302)
         return c.json({ error: '无法获取播放链接' }, 404)
       }
 
-      if (song.source === 'netease' && song.external_url) {
-        const idMatch = song.external_url.match(/id=(\d+)/)
-        if (idMatch) {
-          try {
-            const songData = await metingProxy('netease', 'song', idMatch[1])
-            if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url) {
-              return c.redirect(songData[0].url, 302)
-            }
-          } catch {}
-          try {
-            const songUrlData = await safeFetch(`${NETEASE_API}/song/url?id=${idMatch[1]}`, {})
-            if (songUrlData && songUrlData.data && Array.isArray(songUrlData.data) && songUrlData.data.length > 0 && songUrlData.data[0].url) {
-              return c.redirect(songUrlData.data[0].url, 302)
-            }
-          } catch {}
-          return c.json({ error: '无法获取播放链接，该歌曲可能为VIP专属或已下架' }, 404)
-        }
-      }
-
-      if (song.source === 'qq' && song.external_url && song.external_url.startsWith('tencent:')) {
-        const songMid = song.external_url.replace('tencent:', '')
+      if (extUrl.startsWith('tencent:')) {
+        const songMid = extUrl.replace('tencent:', '')
         try {
           const songData = await metingProxy('tencent', 'song', songMid)
-          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url) {
+          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url && !songData[0].url.includes('api.injahow.cn/meting')) {
             return c.redirect(songData[0].url, 302)
           }
         } catch {}
+        const lxUrl = await lxmusicGetUrl('tx', songMid)
+        if (lxUrl) return c.redirect(lxUrl, 302)
         return c.json({ error: '无法获取播放链接' }, 404)
       }
 
-      if (song.source === 'kugou' && song.external_url && song.external_url.startsWith('kugou:')) {
-        const hash = song.external_url.replace('kugou:', '')
+      if (extUrl.startsWith('kugou:')) {
+        const hash = extUrl.replace('kugou:', '')
         try {
           const songData = await metingProxy('kugou', 'song', hash)
-          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url) {
+          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url && !songData[0].url.includes('api.injahow.cn/meting')) {
             return c.redirect(songData[0].url, 302)
           }
         } catch {}
+        const lxUrl = await lxmusicGetUrl('kg', hash)
+        if (lxUrl) return c.redirect(lxUrl, 302)
         return c.json({ error: '无法获取播放链接' }, 404)
       }
 
-      if (song.source === 'external' && song.external_url) {
+      if (extUrl.startsWith('migu:')) {
+        const miguId = extUrl.replace('migu:', '')
+        const lxUrl = await lxmusicGetUrl('mg', miguId)
+        if (lxUrl) return c.redirect(lxUrl, 302)
+        return c.json({ error: '无法获取播放链接' }, 404)
+      }
+
+      const neteaseIdMatch = extUrl.match(/id=(\d+)/)
+      if (neteaseIdMatch) {
+        const songId = neteaseIdMatch[1]
+        try {
+          const songData = await metingProxy('netease', 'song', songId)
+          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url && !songData[0].url.includes('api.injahow.cn/meting')) {
+            return c.redirect(songData[0].url, 302)
+          }
+        } catch {}
+        try {
+          const songUrlData = await safeFetch(`${NETEASE_API}/song/url?id=${songId}`, {})
+          if (songUrlData && songUrlData.data && Array.isArray(songUrlData.data) && songUrlData.data.length > 0 && songUrlData.data[0].url) {
+            return c.redirect(songUrlData.data[0].url, 302)
+          }
+        } catch {}
+        const lxUrl = await lxmusicGetUrl('wy', songId)
+        if (lxUrl) return c.redirect(lxUrl, 302)
+        return c.json({ error: '无法获取播放链接，该歌曲可能为VIP专属或已下架' }, 404)
+      }
+
+      if (song.source === 'external' && extUrl) {
         return c.json({
           redirect: true,
-          url: song.external_url,
+          url: extUrl,
           title: song.title,
           mime_type: song.mime_type || 'audio/mpeg'
         })
@@ -1198,6 +1234,52 @@ export function registerMusicRoutes(app) {
     } catch (err) {
       return c.json({ error: '获取歌曲详情失败' }, 500)
     }
+  })
+
+  app.get('/api/music/aggregate/search', async (c) => {
+    const user = c.get('user')
+    if (!user) return c.json({ error: '未认证' }, 401)
+
+    const keyword = c.req.query('keyword')
+    if (!keyword) return c.json({ error: '请输入搜索关键词' }, 400)
+
+    const platforms = [
+      { key: 'netease', source: 'netease', label: '网易云' },
+      { key: 'kuwo', source: 'kuwo', label: '酷我' },
+      { key: 'qq', source: 'qq', label: 'QQ' },
+      { key: 'kugou', source: 'kugou', label: '酷狗' },
+    ]
+
+    const results = await Promise.allSettled(
+      platforms.map(async (p) => {
+        try {
+          const baseUrl = new URL(c.req.url)
+          const searchUrl = `${baseUrl.origin}/api/music/${p.key}/search?keyword=${encodeURIComponent(keyword)}`
+          const resp = await fetch(searchUrl, {
+            headers: { 'Authorization': c.req.header('Authorization') || '' },
+            signal: AbortSignal.timeout(15000),
+          })
+          if (!resp.ok) return { source: p.source, label: p.label, songs: [] }
+          const data = await resp.json()
+          return { source: p.source, label: p.label, songs: data.songs || [] }
+        } catch {
+          return { source: p.source, label: p.label, songs: [] }
+        }
+      })
+    )
+
+    const aggregated = {}
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i]
+      const p = platforms[i]
+      if (r.status === 'fulfilled') {
+        aggregated[p.source] = { label: p.label, songs: r.value.songs }
+      } else {
+        aggregated[p.source] = { label: p.label, songs: [] }
+      }
+    }
+
+    return c.json({ keyword, platforms: aggregated })
   })
 
   app.put('/api/music/:id', async (c) => {
