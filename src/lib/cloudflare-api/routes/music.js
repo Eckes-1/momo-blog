@@ -109,6 +109,30 @@ export function registerMusicRoutes(app) {
 
       if (!song) return c.json({ error: '歌曲不存在' }, 404)
 
+      if (song.source === 'kuwo' && song.external_url && song.external_url.startsWith('kuwo:')) {
+        const rid = song.external_url.replace('kuwo:', '')
+        try {
+          const urlResp = await safeFetch(
+            `http://antiserver.kuwo.cn/anti.s?type=convert_url&rid=MUSIC_${rid}&format=mp3&response=url`,
+            { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+          )
+          let playUrl = ''
+          if (urlResp) {
+            if (typeof urlResp === 'string') playUrl = urlResp
+            else if (urlResp.url) playUrl = urlResp.url
+            else if (urlResp.data && urlResp.data.url) playUrl = urlResp.data.url
+          }
+          if (playUrl) return c.redirect(playUrl, 302)
+        } catch {}
+        try {
+          const songData = await metingProxy('kuwo', 'song', rid)
+          if (songData && Array.isArray(songData) && songData.length > 0 && songData[0].url) {
+            return c.redirect(songData[0].url, 302)
+          }
+        } catch {}
+        return c.json({ error: '无法获取播放链接' }, 404)
+      }
+
       if (song.source === 'netease' && song.external_url) {
         const idMatch = song.external_url.match(/id=(\d+)/)
         if (idMatch) {
@@ -740,6 +764,7 @@ export function registerMusicRoutes(app) {
       const needCoverNetease = []
       const needCoverQQ = []
       const needCoverKugou = []
+      const needCoverKuwo = []
 
       for (const item of songs) {
         const title = (item.title || '').trim()
@@ -768,6 +793,7 @@ export function registerMusicRoutes(app) {
             if (source === 'netease') needCoverNetease.push({ id: musicId, url: externalUrl })
             else if (source === 'qq') needCoverQQ.push({ id: musicId, url: externalUrl })
             else if (source === 'kugou') needCoverKugou.push({ id: musicId, url: externalUrl })
+            else if (source === 'kuwo') needCoverKuwo.push({ id: musicId, url: externalUrl })
           }
 
           results.push({ ...song, status: 'ok' })
@@ -857,6 +883,28 @@ export function registerMusicRoutes(app) {
                 const song = results.find(r => r.id === item.id)
                 if (song) song.cover_path = coverUrl
               }
+            }
+          } catch {}
+        }
+      }
+
+      if (needCoverKuwo.length > 0) {
+        for (const item of needCoverKuwo) {
+          const match = item.url.match(/^kuwo:(\d+)$/)
+          if (!match) continue
+          try {
+            const infoData = await safeFetch(
+              `http://m.kuwo.cn/newh5/singles/songinfo?mid=${match[1]}`,
+              { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'http://m.kuwo.cn/' }
+            )
+            if (infoData && infoData.data && infoData.data.pic) {
+              await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(infoData.data.pic, item.id).run()
+              const song = results.find(r => r.id === item.id)
+              if (song) song.cover_path = infoData.data.pic
+            } else if (infoData && infoData.data && infoData.data.albumPic) {
+              await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(infoData.data.albumPic, item.id).run()
+              const song = results.find(r => r.id === item.id)
+              if (song) song.cover_path = infoData.data.albumPic
             }
           } catch {}
         }
@@ -1024,6 +1072,96 @@ export function registerMusicRoutes(app) {
     }
   })
 
+  app.get('/api/music/kuwo/search', async (c) => {
+    const user = c.get('user')
+    if (!user) return c.json({ error: '未认证' }, 401)
+
+    const keyword = c.req.query('keyword')
+    if (!keyword) return c.json({ error: '请输入搜索关键词' }, 400)
+
+    try {
+      const searchUrl = `http://search.kuwo.cn/r.s?all=${encodeURIComponent(keyword)}&ft=music&itemset=web_2013&client=kt&pn=0&rn=100&rformat=json&encoding=utf8`
+      const data = await safeFetch(searchUrl, {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Referer': 'http://www.kuwo.cn/search/list'
+      })
+
+      if (!data || !data.abslist || data.abslist.length === 0) {
+        return c.json({ songs: [], message: '未找到相关歌曲' })
+      }
+
+      const songs = data.abslist.map(s => {
+        const rid = (s.MUSICRID || '').replace('MUSIC_', '')
+        return {
+          id: rid,
+          title: (s.SONGNAME || '').replace(/&nbsp;/g, ' ').trim(),
+          artist: (s.ARTIST || '').replace(/&nbsp;/g, ' ').trim(),
+          album: (s.ALBUM || '').replace(/&nbsp;/g, ' ').trim(),
+          duration: 0,
+          cover: s.MVPIC ? `https://img4.kuwo.cn/star/albumcover/300/35/30/${s.MVPIC}` : '',
+          external_url: `kuwo:${rid}`
+        }
+      })
+
+      return c.json({ songs })
+    } catch (err) {
+      return c.json({ songs: [], message: '搜索失败: ' + (err.message || '请稍后再试') })
+    }
+  })
+
+  app.get('/api/music/kuwo/song/:rid', async (c) => {
+    const user = c.get('user')
+    if (!user) return c.json({ error: '未认证' }, 401)
+
+    const rid = c.req.param('rid')
+    try {
+      const urlResp = await safeFetch(
+        `http://antiserver.kuwo.cn/anti.s?type=convert_url&rid=MUSIC_${rid}&format=mp3&response=url`,
+        { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+      )
+
+      let playUrl = ''
+      if (urlResp) {
+        if (typeof urlResp === 'string') {
+          playUrl = urlResp
+        } else if (urlResp.url) {
+          playUrl = urlResp.url
+        } else if (urlResp.data && urlResp.data.url) {
+          playUrl = urlResp.data.url
+        }
+      }
+
+      if (!playUrl) {
+        const metingData = await metingProxy('kuwo', 'song', rid)
+        if (metingData && Array.isArray(metingData) && metingData.length > 0 && metingData[0].url) {
+          playUrl = metingData[0].url
+        }
+      }
+
+      const infoUrl = `http://m.kuwo.cn/newh5/singles/songinfo?mid=${rid}`
+      let songInfo = {}
+      try {
+        const infoData = await safeFetch(infoUrl, {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15',
+          'Referer': 'http://m.kuwo.cn/'
+        })
+        if (infoData && infoData.data) songInfo = infoData.data
+      } catch {}
+
+      return c.json({
+        id: rid,
+        title: songInfo.songName || songInfo.name || '',
+        artist: songInfo.artist || '',
+        album: songInfo.album || '',
+        duration: songInfo.duration ? Math.round(songInfo.duration / 1000) : 0,
+        cover: songInfo.pic || songInfo.albumPic || '',
+        external_url: playUrl || `kuwo:${rid}`
+      })
+    } catch (err) {
+      return c.json({ error: '获取歌曲详情失败' }, 500)
+    }
+  })
+
   app.put('/api/music/:id', async (c) => {
     const user = c.get('user')
     if (!user) return c.json({ error: '未认证' }, 401)
@@ -1074,6 +1212,7 @@ export function registerMusicRoutes(app) {
       const neteaseSongs = songs.filter(s => s.source === 'netease')
       const qqSongs = songs.filter(s => s.source === 'qq')
       const kugouSongs = songs.filter(s => s.source === 'kugou')
+      const kuwoSongs = songs.filter(s => s.source === 'kuwo')
 
       if (neteaseSongs.length > 0) {
         const idMap = {}
@@ -1147,6 +1286,24 @@ export function registerMusicRoutes(app) {
             )
             if (albumData && albumData.data && albumData.data.imgurl) {
               const coverUrl = albumData.data.imgurl.replace('{size}', '400')
+              await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(coverUrl, song.id).run()
+              updated++
+            }
+          }
+        } catch {}
+      }
+
+      for (const song of kuwoSongs) {
+        const match = (song.external_url || '').match(/^kuwo:(\d+)$/)
+        if (!match) continue
+        try {
+          const infoData = await safeFetch(
+            `http://m.kuwo.cn/newh5/singles/songinfo?mid=${match[1]}`,
+            { 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X)', 'Referer': 'http://m.kuwo.cn/' }
+          )
+          if (infoData && infoData.data) {
+            const coverUrl = infoData.data.pic || infoData.data.albumPic || ''
+            if (coverUrl) {
               await c.env.DB.prepare('UPDATE music SET cover_path = ? WHERE id = ?').bind(coverUrl, song.id).run()
               updated++
             }

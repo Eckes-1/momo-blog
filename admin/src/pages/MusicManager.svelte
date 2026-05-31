@@ -95,6 +95,7 @@
     netease: songs.filter(s => s.source === 'netease').length,
     qq: songs.filter(s => s.source === 'qq').length,
     kugou: songs.filter(s => s.source === 'kugou').length,
+    kuwo: songs.filter(s => s.source === 'kuwo').length,
     external: songs.filter(s => s.source === 'external').length,
     upload: songs.filter(s => s.source === 'upload' || !s.source).length,
     totalDuration: songs.reduce((sum, s) => sum + (s.duration || 0), 0),
@@ -378,6 +379,8 @@
         data = await music.qqSearch(platformKeyword.trim())
       } else if (platform === 'kugou') {
         data = await music.kugouSearch(platformKeyword.trim())
+      } else if (platform === 'kuwo') {
+        data = await music.kuwoSearch(platformKeyword.trim())
       }
       platformResults = data.songs || []
       platformMessage = data.message || ''
@@ -598,6 +601,10 @@
       <p class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">酷狗</p>
       <p class="text-xl font-bold text-blue-600 dark:text-blue-400">{stats.kugou}</p>
     </button>
+    <button onclick={() => { sourceFilter = 'kuwo'; musicPage = 1 }} class="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl border p-3 text-left transition-all duration-200 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-md hover:scale-[1.02] {sourceFilter === 'kuwo' ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}">
+      <p class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">酷我</p>
+      <p class="text-xl font-bold text-orange-600 dark:text-orange-400">{stats.kuwo}</p>
+    </button>
     <button onclick={() => { sourceFilter = 'external'; musicPage = 1 }} class="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl border p-3 text-left transition-all duration-200 shadow-[0_8px_32px_rgba(0,0,0,0.06)] hover:shadow-md hover:scale-[1.02] {sourceFilter === 'external' ? 'border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30' : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'}">
       <p class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">网络</p>
       <p class="text-xl font-bold text-amber-600 dark:text-amber-400">{stats.external}</p>
@@ -756,6 +763,8 @@
                       <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 font-medium">QQ</span>
                     {:else if song.source === 'kugou'}
                       <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium">酷狗</span>
+                    {:else if song.source === 'kuwo'}
+                      <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 font-medium">酷我</span>
                     {:else if song.source === 'external'}
                       <span class="inline-block text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700/50 text-gray-500 dark:text-gray-400 font-medium">网络</span>
                     {:else}
@@ -819,6 +828,7 @@
         <button onclick={() => { platform = 'netease'; platformResults = []; platformSearched = false; platformMessage = '' }} class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {platform === 'netease' ? 'bg-red-500/70 text-white' : 'bg-white/40 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-700/60'}">网易云音乐</button>
         <button onclick={() => { platform = 'qq'; platformResults = []; platformSearched = false; platformMessage = '' }} class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {platform === 'qq' ? 'bg-green-500/70 text-white' : 'bg-white/40 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-700/60'}">QQ音乐</button>
         <button onclick={() => { platform = 'kugou'; platformResults = []; platformSearched = false; platformMessage = '' }} class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {platform === 'kugou' ? 'bg-blue-500/70 text-white' : 'bg-white/40 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-700/60'}">酷狗音乐</button>
+        <button onclick={() => { platform = 'kuwo'; platformResults = []; platformSearched = false; platformMessage = '' }} class="px-3 py-1.5 rounded-full text-sm font-medium transition-colors {platform === 'kuwo' ? 'bg-orange-500/70 text-white' : 'bg-white/40 dark:bg-gray-800/40 text-gray-600 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-gray-700/60'}">酷我音乐</button>
       </div>
 
       <div class="bg-white/60 dark:bg-gray-800/60 backdrop-blur-xl rounded-2xl border border-gray-200 dark:border-gray-700 p-5 space-y-4">

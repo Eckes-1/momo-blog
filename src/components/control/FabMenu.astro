@@ -458,7 +458,7 @@ function initMusicPlayer(container) {
     if (index < 0 || index >= songs.length) return;
     currentIndex = index;
     const song = songs[index];
-    if (song.source === 'qq' || song.source === 'kugou' || song.source === 'netease') {
+    if (song.source === 'qq' || song.source === 'kugou' || song.source === 'netease' || song.source === 'kuwo') {
       audio.src = '/api/music/stream/' + song.id;
     } else if ((song.source === 'external') && song.external_url) {
       audio.src = song.external_url;

@@ -473,6 +473,8 @@ export const music = {
   qqPlaylist(id) { return request(`/music/qq/playlist/${id}`) },
   kugouSearch(keyword) { return request(`/music/kugou/search?keyword=${encodeURIComponent(keyword)}`) },
   kugouSong(hash) { return request(`/music/kugou/song/${hash}`) },
+  kuwoSearch(keyword) { return request(`/music/kuwo/search?keyword=${encodeURIComponent(keyword)}`) },
+  kuwoSong(rid) { return request(`/music/kuwo/song/${rid}`) },
   updateCovers() { return request('/music/update-covers', { method: 'POST' }) },
   importSongs(songs, source = 'external') { return request('/music/netease/import', { method: 'POST', body: JSON.stringify({ songs, source }) }) }
 }
