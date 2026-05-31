@@ -50,7 +50,7 @@ app.use('/api/*', async (c, next) => {
 
   const publicGetPaths = ['/api/posts', '/api/categories', '/api/links', '/api/site', '/api/music']
   const publicExactGetPaths = ['/api/comments', '/api/site/fingerprint']
-  const adminSubPaths = ['/stats', '/batch', '/admin/', '/toggle-pin', '/toggle-draft', '/netease', '/qq', '/kugou', '/add', '/upload', '/update-covers']
+  const adminSubPaths = ['/stats', '/batch', '/admin/', '/toggle-pin', '/toggle-draft', '/netease', '/qq', '/kugou', '/kuwo', '/add', '/upload', '/update-covers']
 
   if (method === 'GET') {
     const isPublicExact = publicExactGetPaths.some(p => path === p)
